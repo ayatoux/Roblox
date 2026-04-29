@@ -2,8 +2,9 @@
 local player = game.Players.LocalPlayer
 local rs = game:GetService("ReplicatedStorage")
 
---// REMOTE SPIN
-local spin = rs:WaitForChild("Client"):WaitForChild("Spin")
+--// REMOTE SPIN (Thêm thời gian chờ 5s để tránh treo script nếu không tìm thấy)
+local clientFolder = rs:WaitForChild("Client", 5)
+local spin = clientFolder and clientFolder:WaitForChild("Spin", 5)
 
 --// GUI
 local gui = Instance.new("ScreenGui")
@@ -93,13 +94,20 @@ local function getChar()
 end
 
 local function getLevel()
-    local lvlLabel = player.PlayerGui.StatsGui.BarsFrame.Level
-    return tonumber(string.match(lvlLabel.Text, "%d+")) or 1
+    -- Thêm pcall để tránh lỗi nếu GUI game chưa load
+    local success, res = pcall(function()
+        local lvlLabel = player.PlayerGui.StatsGui.BarsFrame.Level
+        return tonumber(string.match(lvlLabel.Text, "%d+"))
+    end)
+    return success and res or 1
 end
 
 local function getSpinCount()
-    local txt = player.PlayerGui.Spinner.Frame.Spin.TextLabel.Text
-    return tonumber(string.match(txt, "%d+")) or 0
+    local success, res = pcall(function()
+        local txt = player.PlayerGui.Spinner.Frame.Spin.TextLabel.Text
+        return tonumber(string.match(txt, "%d+"))
+    end)
+    return success and res or 0
 end
 
 local function resetChar()
@@ -110,16 +118,17 @@ local function resetChar()
     end
 end
 
--- 🔥 LẤY SKILL CHỈ TỪ BACKPACK (Đã sửa theo yêu cầu)
+-- 🔥 LẤY SKILL CHỈ TỪ BACKPACK (Yêu cầu của bạn)
 local function getSkills()
     local skills = {}
-
-    for _, v in pairs(player.Backpack:GetChildren()) do
-        if v:IsA("Tool") then
-            table.insert(skills, v)
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then
+        for _, v in pairs(backpack:GetChildren()) do
+            if v:IsA("Tool") then
+                table.insert(skills, v)
+            end
         end
     end
-
     return skills
 end
 
@@ -143,27 +152,31 @@ task.spawn(function()
     end
 end)
 
--- AUTO FARM (dùng skill hiện có)
+-- AUTO FARM
 task.spawn(function()
     while true do
         if autoFarm and not spinning then
             local char = getChar()
-            local root = char:WaitForChild("HumanoidRootPart")
-            local base = workspace:WaitForChild("Base")
+            local root = char:WaitForChild("HumanoidRootPart", 5)
+            local base = workspace:FindFirstChild("Base") -- Dùng FindFirstChild để không bị kẹt nếu thiếu Base
 
-            root.CFrame = base.CFrame + Vector3.new(0,3,0)
+            if root and base then
+                root.CFrame = base.CFrame + Vector3.new(0,3,0)
+            end
 
             local skills = getSkills()
 
             for _, tool in ipairs(skills) do
-                char.Humanoid:EquipTool(tool)
-                task.wait(0.1)
+                if autoFarm and char:FindFirstChildOfClass("Humanoid") then
+                    char.Humanoid:EquipTool(tool)
+                    task.wait(0.1)
 
-                pcall(function()
-                    tool:Activate()
-                end)
+                    pcall(function()
+                        tool:Activate()
+                    end)
 
-                task.wait(0.2)
+                    task.wait(0.2)
+                end
             end
         end
         task.wait(0.3)
@@ -173,16 +186,13 @@ end)
 -- AUTO SPIN LOOP
 task.spawn(function()
     while true do
-        if autoSpin and not spinning then
+        if autoSpin and not spinning and spin then
             if getLevel() >= 5 then
                 spinning = true
-
                 spin:InvokeServer()
                 task.wait(1)
-
                 resetChar()
                 task.wait(3)
-
                 spinning = false
             end
         end
