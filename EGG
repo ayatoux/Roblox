@@ -1,209 +1,115 @@
 --// SERVICES
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
 
---// REMOTES
-local L_1_ = ReplicatedStorage[player.UserId .. "Client"].StartMove
-local L_2_ = ReplicatedStorage[player.UserId .. "Client"].EndMove
-local SpinRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Spin")
-
---// STATE
-local farmEXP = false
+--// VARIABLES
+local autoFarm = false
 local autoSpin = false
-local spinning = false
+local autoIntro = false
+
 local moves = {}
 
--------------------------------------------------
--- GUI
--------------------------------------------------
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "AutoFarmGUI"
-ScreenGui.ResetOnSpawn = false
+--// REMOTES
+local clientFolder = ReplicatedStorage:WaitForChild(player.UserId .. "Client")
+local StartMove = clientFolder:WaitForChild("StartMove")
+local EndMove = clientFolder:WaitForChild("EndMove")
 
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 260, 0, 220)
-Main.Position = UDim2.new(0.1, 0, 0.3, 0)
-Main.BackgroundColor3 = Color3.fromRGB(25,25,25)
-Instance.new("UICorner", Main)
+local SpinRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Spin")
+local IntroRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Intro")
+local GetSpinsRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("GetSpins")
 
-local Title = Instance.new("TextLabel", Main)
-Title.Size = UDim2.new(1,0,0,30)
-Title.BackgroundTransparency = 1
-Title.Text = "AUTO SYSTEM"
-Title.TextColor3 = Color3.new(1,1,1)
+--// GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "MobileGUI"
 
-local LevelText = Instance.new("TextLabel", Main)
-LevelText.Position = UDim2.new(0,0,0,35)
-LevelText.Size = UDim2.new(1,0,0,25)
-LevelText.BackgroundTransparency = 1
-LevelText.TextColor3 = Color3.new(1,1,1)
-LevelText.Text = "Level: ..."
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 250)
+frame.Position = UDim2.new(0.1, 0, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Active = true
+frame.Draggable = true
 
-local SpinText = Instance.new("TextLabel", Main)
-SpinText.Position = UDim2.new(0,0,0,60)
-SpinText.Size = UDim2.new(1,0,0,25)
-SpinText.BackgroundTransparency = 1
-SpinText.TextColor3 = Color3.new(1,1,1)
-SpinText.Text = "Spin: ..."
-
--- AUTO FARM BUTTON
-local FarmBtn = Instance.new("TextButton", Main)
-FarmBtn.Size = UDim2.new(0.8,0,0,40)
-FarmBtn.Position = UDim2.new(0.1,0,0.55,0)
-FarmBtn.Text = "Auto Farm: OFF"
-Instance.new("UICorner", FarmBtn)
-
--- AUTO SPIN BUTTON
-local SpinBtn = Instance.new("TextButton", Main)
-SpinBtn.Size = UDim2.new(0.8,0,0,40)
-SpinBtn.Position = UDim2.new(0.1,0,0.78,0)
-SpinBtn.Text = "Auto Spin: OFF"
-Instance.new("UICorner", SpinBtn)
-
--------------------------------------------------
--- DRAG
--------------------------------------------------
-local dragging, dragInput, dragStart, startPos
-
-Main.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-	or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = true
-		dragStart = input.Position
-		startPos = Main.Position
-
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
-			end
-		end)
-	end
-end)
-
-Main.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement
-	or input.UserInputType == Enum.UserInputType.Touch then
-		dragInput = input
-	end
-end)
-
-game:GetService("RunService").RenderStepped:Connect(function()
-	if dragging and dragInput then
-		local delta = dragInput.Position - dragStart
-		Main.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
-		)
-	end
-end)
-
--------------------------------------------------
--- BUTTONS
--------------------------------------------------
-FarmBtn.MouseButton1Click:Connect(function()
-	farmEXP = not farmEXP
-	FarmBtn.Text = "Auto Farm: " .. (farmEXP and "ON" or "OFF")
-end)
-
-SpinBtn.MouseButton1Click:Connect(function()
-	autoSpin = not autoSpin
-	SpinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
-end)
-
--------------------------------------------------
--- SAFE GET TEXT
--------------------------------------------------
-local function getText(obj)
-	if not obj then return nil end
-	if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-		return obj.Text
-	end
-	local child = obj:FindFirstChildWhichIsA("TextLabel")
-	if child then
-		return child.Text
-	end
-	return nil
+local function createButton(text, y)
+	local btn = Instance.new("TextButton", frame)
+	btn.Size = UDim2.new(1, -10, 0, 35)
+	btn.Position = UDim2.new(0, 5, 0, y)
+	btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Text = text
+	return btn
 end
 
--------------------------------------------------
--- UPDATE UI
--------------------------------------------------
-task.spawn(function()
-	while true do
-		local statsGui = player.PlayerGui:FindFirstChild("StatsGui")
-		local spinnerGui = player.PlayerGui:FindFirstChild("Spinner")
+local levelLabel = Instance.new("TextLabel", frame)
+levelLabel.Size = UDim2.new(1, -10, 0, 25)
+levelLabel.Position = UDim2.new(0, 5, 0, 5)
+levelLabel.TextColor3 = Color3.new(1,1,1)
+levelLabel.BackgroundTransparency = 1
+levelLabel.Text = "Level: ?"
 
-		if statsGui and statsGui:FindFirstChild("BarsFrame") then
-			local levelObj = statsGui.BarsFrame:FindFirstChild("Level")
-			local txt = getText(levelObj)
-			if txt then
-				LevelText.Text = "Level: " .. txt
-			end
-		end
+local spinLabel = Instance.new("TextLabel", frame)
+spinLabel.Size = UDim2.new(1, -10, 0, 25)
+spinLabel.Position = UDim2.new(0, 5, 0, 30)
+spinLabel.TextColor3 = Color3.new(1,1,1)
+spinLabel.BackgroundTransparency = 1
+spinLabel.Text = "Spin: ?"
 
-		if spinnerGui and spinnerGui:FindFirstChild("Frame") then
-			local spinObj = spinnerGui.Frame:FindFirstChild("Spin")
-			local txt = getText(spinObj)
-			if txt then
-				SpinText.Text = "Spin: " .. txt
-			end
-		end
+local farmBtn = createButton("Auto Farm: OFF", 60)
+local spinBtn = createButton("Auto Spin: OFF", 100)
+local introBtn = createButton("Skip Intro: OFF", 140)
 
-		task.wait(0.5)
+--// BUTTON EVENTS
+farmBtn.MouseButton1Click:Connect(function()
+	autoFarm = not autoFarm
+	farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
+end)
+
+spinBtn.MouseButton1Click:Connect(function()
+	autoSpin = not autoSpin
+	spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
+end)
+
+introBtn.MouseButton1Click:Connect(function()
+	autoIntro = not autoIntro
+	introBtn.Text = "Skip Intro: " .. (autoIntro and "ON" or "OFF")
+end)
+
+--// GET LEVEL
+local function getLevel()
+	local success, result = pcall(function()
+		return player.PlayerGui.StatsGui.BarsFrame.Level.Text
+	end)
+	return success and result or "?"
+end
+
+--// GET SPIN (SERVER FIRST)
+local function getSpin()
+	local success, result = pcall(function()
+		return GetSpinsRemote:InvokeServer()
+	end)
+
+	if success and result then
+		return tostring(result)
 	end
-end)
 
--------------------------------------------------
--- AUTO SPIN
--------------------------------------------------
+	-- fallback GUI
+	local success2, result2 = pcall(function()
+		return player.PlayerGui.Spinner.Frame.Spin.TextLabel.Text
+	end)
+
+	return success2 and result2 or "?"
+end
+
+--// AUTOFARM
 task.spawn(function()
 	while true do
-		if autoSpin then
-			local statsGui = player.PlayerGui:FindFirstChild("StatsGui")
-
-			if statsGui and statsGui:FindFirstChild("BarsFrame") then
-				local levelObj = statsGui.BarsFrame:FindFirstChild("Level")
-				local txt = getText(levelObj)
-
-				local level = tonumber(txt)
-
-				if level and level > 5 and not spinning then
-					spinning = true
-
-					pcall(function()
-						SpinRemote:InvokeServer()
-					end)
-
-					task.wait(1)
-					if player.Character then
-						player.Character:BreakJoints()
-					end
-				end
-			end
-		end
-
-		task.wait(1)
-	end
-end)
-
-player.CharacterAdded:Connect(function()
-	task.wait(1)
-	spinning = false
-end)
-
--------------------------------------------------
--- AUTOFARM
--------------------------------------------------
-task.spawn(function()
-	while true do
-		if farmEXP then
+		if autoFarm then
+			local character = player.Character
 			local backpack = player:FindFirstChild("Backpack")
 
-			if backpack then
+			if character and backpack then
 				table.clear(moves)
 
 				for _, tool in ipairs(backpack:GetChildren()) do
@@ -212,26 +118,78 @@ task.spawn(function()
 					end
 				end
 
-				for _, move in ipairs(moves) do
-					L_1_:FireServer(move)
-				end
+				if #moves > 0 then
+					for _, move in ipairs(moves) do
+						StartMove:FireServer(move)
+					end
 
-				task.wait(0.05)
+					task.wait(0.05)
 
-				for _, move in ipairs(moves) do
-					L_2_:FireServer(move)
+					for _, move in ipairs(moves) do
+						EndMove:FireServer(move)
+					end
 				end
 			end
 		end
-
 		task.wait(0.15)
 	end
 end)
 
--------------------------------------------------
--- ANTI AFK
--------------------------------------------------
+--// AUTOSPIN
+task.spawn(function()
+	while true do
+		if autoSpin then
+			local levelText = getLevel()
+			local level = tonumber(string.match(levelText, "%d+"))
+			local spins = tonumber(getSpin())
+
+			if level and level >= 6 and spins and spins > 0 then
+				pcall(function()
+					SpinRemote:InvokeServer()
+				end)
+
+				task.wait(1)
+
+				if player.Character then
+					player.Character:BreakJoints()
+				end
+
+				task.wait(3)
+			end
+		end
+		task.wait(1)
+	end
+end)
+
+--// AUTO INTRO
+task.spawn(function()
+	while true do
+		if autoIntro then
+			pcall(function()
+				IntroRemote:InvokeServer()
+			end)
+		end
+		task.wait(1)
+	end
+end)
+
+--// UPDATE UI
+task.spawn(function()
+	while true do
+		levelLabel.Text = "Level: " .. getLevel()
+		spinLabel.Text = "Spin: " .. getSpin()
+		task.wait(0.5)
+	end
+end)
+
+--// RESPAWN FIX
+player.CharacterAdded:Connect(function()
+	task.wait(1)
+	print("Script vẫn chạy sau respawn")
+end)
+
+--// ANTI AFK
 player.Idled:Connect(function()
-	game:GetService("VirtualUser"):CaptureController()
-	game:GetService("VirtualUser"):ClickButton2(Vector2.new(0,0))
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new(0,0))
 end)
