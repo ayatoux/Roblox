@@ -110,23 +110,14 @@ local function resetChar()
     end
 end
 
--- 🔥 LẤY TẤT CẢ SKILL (Tool)
+-- 🔥 LẤY SKILL CHỈ TỪ BACKPACK
 local function getSkills()
-    local char = getChar()
     local skills = {}
-
     for _, v in pairs(player.Backpack:GetChildren()) do
         if v:IsA("Tool") then
             table.insert(skills, v)
         end
     end
-
-    for _, v in pairs(char:GetChildren()) do
-        if v:IsA("Tool") then
-            table.insert(skills, v)
-        end
-    end
-
     return skills
 end
 
@@ -150,11 +141,12 @@ task.spawn(function()
     end
 end)
 
--- AUTO FARM (dùng skill hiện có)
+-- AUTO FARM (Đã sửa logic kích hoạt)
 task.spawn(function()
     while true do
         if autoFarm and not spinning then
             local char = getChar()
+            local hum = char:WaitForChild("Humanoid")
             local root = char:WaitForChild("HumanoidRootPart")
             local base = workspace:WaitForChild("Base")
 
@@ -163,14 +155,22 @@ task.spawn(function()
             local skills = getSkills()
 
             for _, tool in ipairs(skills) do
-                char.Humanoid:EquipTool(tool)
-                task.wait(0.1)
-
-                pcall(function()
-                    tool:Activate()
-                end)
-
-                task.wait(0.2)
+                if autoFarm then
+                    -- Trang bị tool
+                    hum:EquipTool(tool)
+                    
+                    -- Chờ một chút để tool thực sự nằm trong Character
+                    task.wait(0.15) 
+                    
+                    -- Kích hoạt tool
+                    if tool.Parent == char then
+                        pcall(function()
+                            tool:Activate()
+                        end)
+                    end
+                    
+                    task.wait(0.1)
+                end
             end
         end
         task.wait(0.3)
@@ -183,13 +183,10 @@ task.spawn(function()
         if autoSpin and not spinning then
             if getLevel() >= 5 then
                 spinning = true
-
                 spin:InvokeServer()
                 task.wait(1)
-
                 resetChar()
                 task.wait(3)
-
                 spinning = false
             end
         end
