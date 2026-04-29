@@ -1,0 +1,186 @@
+--// SERVICES
+local player = game.Players.LocalPlayer
+local rs = game:GetService("ReplicatedStorage")
+
+--// REMOTE
+local spin = rs:WaitForChild("Client"):WaitForChild("Spin")
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AyatoHub"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,220,0,200)
+frame.Position = UDim2.new(0,20,0.4,0)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "Ayato Hub (Drag)"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+
+-- LEVEL DISPLAY
+local levelLabelUI = Instance.new("TextLabel", frame)
+levelLabelUI.Size = UDim2.new(1,0,0,25)
+levelLabelUI.Position = UDim2.new(0,0,0,30)
+levelLabelUI.Text = "Level: ..."
+levelLabelUI.TextColor3 = Color3.new(1,1,1)
+levelLabelUI.BackgroundTransparency = 1
+
+-- SPIN DISPLAY
+local spinLabelUI = Instance.new("TextLabel", frame)
+spinLabelUI.Size = UDim2.new(1,0,0,25)
+spinLabelUI.Position = UDim2.new(0,0,0,55)
+spinLabelUI.Text = "Spins: ..."
+spinLabelUI.TextColor3 = Color3.new(1,1,1)
+spinLabelUI.BackgroundTransparency = 1
+
+-- DRAG (fix luôn cho PC + mobile)
+local dragging, dragStart, startPos
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- BUTTONS
+local farmBtn = Instance.new("TextButton", frame)
+farmBtn.Size = UDim2.new(1,-20,0,40)
+farmBtn.Position = UDim2.new(0,10,0,85)
+farmBtn.Text = "Auto Farm: OFF"
+
+local spinBtn = Instance.new("TextButton", frame)
+spinBtn.Size = UDim2.new(1,-20,0,40)
+spinBtn.Position = UDim2.new(0,10,0,135)
+spinBtn.Text = "Auto Spin: OFF"
+
+-- SETTINGS
+local autoFarm = false
+local autoSpin = false
+local spinning = false
+
+-- FUNCTIONS
+local function getChar()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+-- 🔥 LẤY SKILL TRONG BACKPACK
+local function getSkills()
+    local backpack = player:WaitForChild("Backpack")
+    local skillList = {}
+
+    for _, item in ipairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            table.insert(skillList, item.Name)
+        end
+    end
+
+    return skillList
+end
+
+local function getLevel()
+    local lvlLabel = player.PlayerGui.StatsGui.BarsFrame.Level
+    return tonumber(string.match(lvlLabel.Text, "%d+")) or 1
+end
+
+local function getSpinCount()
+    local spinText = player.PlayerGui.Spinner.Frame.Spin.TextLabel
+    return tonumber(string.match(spinText.Text, "%d+")) or 0
+end
+
+local function resetChar()
+    local char = getChar()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.Health = 0
+    end
+end
+
+-- BUTTON
+farmBtn.MouseButton1Click:Connect(function()
+    autoFarm = not autoFarm
+    farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
+end)
+
+spinBtn.MouseButton1Click:Connect(function()
+    autoSpin = not autoSpin
+    spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
+end)
+
+-- UPDATE UI
+task.spawn(function()
+    while true do
+        levelLabelUI.Text = "Level: " .. getLevel()
+        spinLabelUI.Text = "Spins: " .. getSpinCount()
+        task.wait(0.5)
+    end
+end)
+
+-- AUTO FARM (🔥 dùng skill từ backpack)
+task.spawn(function()
+    while true do
+        if autoFarm and not spinning then
+            local char = getChar()
+            local root = char:WaitForChild("HumanoidRootPart")
+            local base = workspace:WaitForChild("Base")
+
+            root.CFrame = base.CFrame + Vector3.new(0,3,0)
+
+            local skills = getSkills()
+
+            for _, skill in ipairs(skills) do
+                rs:WaitForChild("864144468Client")
+                  :WaitForChild("StartMove"):FireServer(skill)
+
+                task.wait(0.1)
+
+                rs:WaitForChild("864144468Client")
+                  :WaitForChild("EndMove"):FireServer(skill)
+            end
+        end
+        task.wait(0.3)
+    end
+end)
+
+-- AUTO SPIN
+task.spawn(function()
+    while true do
+        if autoSpin and not spinning then
+            if getLevel() >= 5 then
+                spinning = true
+
+                spin:InvokeServer()
+                task.wait(1)
+
+                resetChar()
+                task.wait(3)
+
+                spinning = false
+            end
+        end
+        task.wait(1)
+    end
+end)
