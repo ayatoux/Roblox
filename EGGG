@@ -1,6 +1,8 @@
+```lua
 --// SERVICES
 local player = game.Players.LocalPlayer
 local rs = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
 
 --// REMOTE
 local spin = rs:WaitForChild("Client"):WaitForChild("Spin")
@@ -22,7 +24,7 @@ title.Text = "Ayato Hub (Drag)"
 title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 
--- LEVEL DISPLAY
+-- LEVEL
 local levelLabelUI = Instance.new("TextLabel", frame)
 levelLabelUI.Size = UDim2.new(1,0,0,25)
 levelLabelUI.Position = UDim2.new(0,0,0,30)
@@ -30,7 +32,7 @@ levelLabelUI.Text = "Level: ..."
 levelLabelUI.TextColor3 = Color3.new(1,1,1)
 levelLabelUI.BackgroundTransparency = 1
 
--- SPIN DISPLAY
+-- SPIN
 local spinLabelUI = Instance.new("TextLabel", frame)
 spinLabelUI.Size = UDim2.new(1,0,0,25)
 spinLabelUI.Position = UDim2.new(0,0,0,55)
@@ -38,7 +40,7 @@ spinLabelUI.Text = "Spins: ..."
 spinLabelUI.TextColor3 = Color3.new(1,1,1)
 spinLabelUI.BackgroundTransparency = 1
 
--- DRAG (fix dùng được cả PC + Mobile)
+-- DRAG (PC + MOBILE)
 local dragging, dragInput, dragStart, startPos
 
 title.InputBegan:Connect(function(input)
@@ -57,7 +59,7 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
+UIS.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
         frame.Position = UDim2.new(
@@ -95,27 +97,6 @@ local spinning = false
 -- FUNCTIONS
 local function getChar()
     return player.Character or player.CharacterAdded:Wait()
-end
-
--- LẤY SKILL TỪ BACKPACK + CHARACTER
-local function getSkills()
-    local skillList = {}
-
-    local function scan(container)
-        for _, tool in ipairs(container:GetChildren()) do
-            if tool:IsA("Tool") then
-                table.insert(skillList, tool.Name)
-            end
-        end
-    end
-
-    scan(player:WaitForChild("Backpack"))
-    
-    if player.Character then
-        scan(player.Character)
-    end
-
-    return skillList
 end
 
 local function getLevel()
@@ -165,27 +146,50 @@ task.spawn(function()
     end
 end)
 
--- AUTO FARM
+-- AUTO FARM (EQUIP + REMOTE)
 task.spawn(function()
     while true do
         if autoFarm and not spinning then
             local char = getChar()
             local root = char:WaitForChild("HumanoidRootPart")
+            local hum = char:WaitForChild("Humanoid")
             local base = workspace:WaitForChild("Base")
 
+            -- teleport
             root.CFrame = base.CFrame + Vector3.new(0,3,0)
 
-            local skills = getSkills()
+            -- lấy tool
+            local tools = {}
 
-            if #skills > 0 then
-                for _, skill in ipairs(skills) do
+            for _, v in ipairs(player.Backpack:GetChildren()) do
+                if v:IsA("Tool") then
+                    table.insert(tools, v)
+                end
+            end
+
+            for _, v in ipairs(char:GetChildren()) do
+                if v:IsA("Tool") then
+                    table.insert(tools, v)
+                end
+            end
+
+            -- dùng remote sau khi equip
+            for _, tool in ipairs(tools) do
+                if tool and tool.Parent then
+                    hum:EquipTool(tool)
+                    task.wait(0.15)
+
+                    local skillName = tool.Name
+
                     rs:WaitForChild("864144468Client")
-                      :WaitForChild("StartMove"):FireServer(skill)
+                        :WaitForChild("StartMove"):FireServer(skillName)
 
-                    task.wait(0.1)
+                    task.wait(0.15)
 
                     rs:WaitForChild("864144468Client")
-                      :WaitForChild("EndMove"):FireServer(skill)
+                        :WaitForChild("EndMove"):FireServer(skillName)
+
+                    task.wait(0.2)
                 end
             end
         end
@@ -215,3 +219,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
+```
