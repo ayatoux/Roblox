@@ -2,12 +2,8 @@
 local player = game.Players.LocalPlayer
 local rs = game:GetService("ReplicatedStorage")
 
---// REMOTES
+--// REMOTE
 local spin = rs:WaitForChild("Client"):WaitForChild("Spin")
-
-local moveFolder = rs:WaitForChild("864144468Client")
-local startMove = moveFolder:WaitForChild("StartMove")
-local endMove = moveFolder:WaitForChild("EndMove")
 
 --// GUI
 local gui = Instance.new("ScreenGui")
@@ -26,9 +22,24 @@ title.Text = "Ayato Hub (Drag)"
 title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 
--- DRAG MOBILE
-local dragging, dragInput, dragStart, startPos
+-- LEVEL DISPLAY
+local levelLabelUI = Instance.new("TextLabel", frame)
+levelLabelUI.Size = UDim2.new(1,0,0,25)
+levelLabelUI.Position = UDim2.new(0,0,0,30)
+levelLabelUI.Text = "Level: ..."
+levelLabelUI.TextColor3 = Color3.new(1,1,1)
+levelLabelUI.BackgroundTransparency = 1
 
+-- SPIN DISPLAY
+local spinLabelUI = Instance.new("TextLabel", frame)
+spinLabelUI.Size = UDim2.new(1,0,0,25)
+spinLabelUI.Position = UDim2.new(0,0,0,55)
+spinLabelUI.Text = "Spins: ..."
+spinLabelUI.TextColor3 = Color3.new(1,1,1)
+spinLabelUI.BackgroundTransparency = 1
+
+-- DRAG
+local dragging, dragInput, dragStart, startPos
 title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
@@ -61,22 +72,6 @@ title.InputEnded:Connect(function(input)
     end
 end)
 
--- DISPLAY LEVEL
-local levelUI = Instance.new("TextLabel", frame)
-levelUI.Size = UDim2.new(1,0,0,25)
-levelUI.Position = UDim2.new(0,0,0,30)
-levelUI.Text = "Level: ..."
-levelUI.TextColor3 = Color3.new(1,1,1)
-levelUI.BackgroundTransparency = 1
-
--- DISPLAY SPIN
-local spinUI = Instance.new("TextLabel", frame)
-spinUI.Size = UDim2.new(1,0,0,25)
-spinUI.Position = UDim2.new(0,0,0,55)
-spinUI.Text = "Spins: ..."
-spinUI.TextColor3 = Color3.new(1,1,1)
-spinUI.BackgroundTransparency = 1
-
 -- BUTTONS
 local farmBtn = Instance.new("TextButton", frame)
 farmBtn.Size = UDim2.new(1,-20,0,40)
@@ -93,19 +88,38 @@ local autoFarm = false
 local autoSpin = false
 local spinning = false
 
+-- SKILLS
+local skills = {
+    "Demonstration",
+    "Rocket Blast",
+    "Soaring Rocket",
+    "Firework Traversal",
+    "Recursive Fireworks"
+}
+
 -- FUNCTIONS
 local function getChar()
     return player.Character or player.CharacterAdded:Wait()
 end
 
 local function getLevel()
-    local txt = player.PlayerGui.StatsGui.BarsFrame.Level.Text
-    return tonumber(string.match(txt, "%d+")) or 1
+    local lvlLabel = player:WaitForChild("PlayerGui")
+        :WaitForChild("StatsGui")
+        :WaitForChild("BarsFrame")
+        :WaitForChild("Level")
+
+    return tonumber(string.match(lvlLabel.Text, "%d+")) or 1
 end
 
 local function getSpinCount()
-    local txt = player.PlayerGui.Spinner.Frame.Spin.TextLabel.Text
-    return tonumber(string.match(txt, "%d+")) or 0
+    local spinText = player:WaitForChild("PlayerGui")
+        :WaitForChild("Spinner")
+        :WaitForChild("Frame")
+        :WaitForChild("Spin")
+        :WaitForChild("TextLabel")
+
+    local text = spinText.Text -- ví dụ: "Spins: 10"
+    return tonumber(string.match(text, "%d+")) or 0
 end
 
 local function resetChar()
@@ -116,20 +130,7 @@ local function resetChar()
     end
 end
 
--- 🔥 AUTO DETECT SKILL
-local function getSkills()
-    local skills = {}
-
-    for _, v in pairs(moveFolder:GetChildren()) do
-        if v:IsA("Folder") or v:IsA("ModuleScript") then
-            table.insert(skills, v.Name)
-        end
-    end
-
-    return skills
-end
-
--- BUTTON TOGGLE
+-- BUTTON
 farmBtn.MouseButton1Click:Connect(function()
     autoFarm = not autoFarm
     farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
@@ -143,8 +144,8 @@ end)
 -- UPDATE UI
 task.spawn(function()
     while true do
-        levelUI.Text = "Level: " .. getLevel()
-        spinUI.Text = "Spins: " .. getSpinCount()
+        levelLabelUI.Text = "Level: " .. getLevel()
+        spinLabelUI.Text = "Spins: " .. getSpinCount()
         task.wait(0.5)
     end
 end)
@@ -159,14 +160,14 @@ task.spawn(function()
 
             root.CFrame = base.CFrame + Vector3.new(0,3,0)
 
-            local skills = getSkills()
-
             for _, skill in ipairs(skills) do
-                pcall(function()
-                    startMove:FireServer(skill)
-                    task.wait(0.1)
-                    endMove:FireServer(skill)
-                end)
+                rs:WaitForChild("864144468Client")
+                  :WaitForChild("StartMove"):FireServer(skill)
+
+                task.wait(0.1)
+
+                rs:WaitForChild("864144468Client")
+                  :WaitForChild("EndMove"):FireServer(skill)
             end
         end
         task.wait(0.3)
@@ -177,7 +178,9 @@ end)
 task.spawn(function()
     while true do
         if autoSpin and not spinning then
-            if getLevel() >= 5 then
+            local lvl = getLevel()
+
+            if lvl >= 5 then
                 spinning = true
 
                 spin:InvokeServer()
