@@ -11,27 +11,27 @@ local SpinRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Spin")
 
 --// STATE
 local farmEXP = false
+local autoSpin = false
+local spinning = false
 local moves = {}
-local spinning = false -- chỉ spin 1 lần mỗi lần sống
 
 -------------------------------------------------
--- GUI (GIỮ NGUYÊN)
+-- GUI
 -------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 ScreenGui.Name = "AutoFarmGUI"
 ScreenGui.ResetOnSpawn = false
 
 local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0, 240, 0, 180)
+Main.Size = UDim2.new(0, 260, 0, 220)
 Main.Position = UDim2.new(0.1, 0, 0.3, 0)
 Main.BackgroundColor3 = Color3.fromRGB(25,25,25)
-
 Instance.new("UICorner", Main)
 
 local Title = Instance.new("TextLabel", Main)
 Title.Size = UDim2.new(1,0,0,30)
 Title.BackgroundTransparency = 1
-Title.Text = "AUTO FARM"
+Title.Text = "AUTO SYSTEM"
 Title.TextColor3 = Color3.new(1,1,1)
 
 local LevelText = Instance.new("TextLabel", Main)
@@ -39,22 +39,31 @@ LevelText.Position = UDim2.new(0,0,0,35)
 LevelText.Size = UDim2.new(1,0,0,25)
 LevelText.BackgroundTransparency = 1
 LevelText.TextColor3 = Color3.new(1,1,1)
+LevelText.Text = "Level: ..."
 
 local SpinText = Instance.new("TextLabel", Main)
 SpinText.Position = UDim2.new(0,0,0,60)
 SpinText.Size = UDim2.new(1,0,0,25)
 SpinText.BackgroundTransparency = 1
 SpinText.TextColor3 = Color3.new(1,1,1)
+SpinText.Text = "Spin: ..."
 
-local ToggleBtn = Instance.new("TextButton", Main)
-ToggleBtn.Size = UDim2.new(0.8,0,0,40)
-ToggleBtn.Position = UDim2.new(0.1,0,0.65,0)
-ToggleBtn.Text = "OFF"
+-- AUTO FARM BUTTON
+local FarmBtn = Instance.new("TextButton", Main)
+FarmBtn.Size = UDim2.new(0.8,0,0,40)
+FarmBtn.Position = UDim2.new(0.1,0,0.55,0)
+FarmBtn.Text = "Auto Farm: OFF"
+Instance.new("UICorner", FarmBtn)
 
-Instance.new("UICorner", ToggleBtn)
+-- AUTO SPIN BUTTON
+local SpinBtn = Instance.new("TextButton", Main)
+SpinBtn.Size = UDim2.new(0.8,0,0,40)
+SpinBtn.Position = UDim2.new(0.1,0,0.78,0)
+SpinBtn.Text = "Auto Spin: OFF"
+Instance.new("UICorner", SpinBtn)
 
 -------------------------------------------------
--- DRAG (MOBILE)
+-- DRAG
 -------------------------------------------------
 local dragging, dragInput, dragStart, startPos
 
@@ -93,12 +102,32 @@ game:GetService("RunService").RenderStepped:Connect(function()
 end)
 
 -------------------------------------------------
--- TOGGLE
+-- BUTTONS
 -------------------------------------------------
-ToggleBtn.MouseButton1Click:Connect(function()
+FarmBtn.MouseButton1Click:Connect(function()
 	farmEXP = not farmEXP
-	ToggleBtn.Text = farmEXP and "ON" or "OFF"
+	FarmBtn.Text = "Auto Farm: " .. (farmEXP and "ON" or "OFF")
 end)
+
+SpinBtn.MouseButton1Click:Connect(function()
+	autoSpin = not autoSpin
+	SpinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
+end)
+
+-------------------------------------------------
+-- SAFE GET TEXT
+-------------------------------------------------
+local function getText(obj)
+	if not obj then return nil end
+	if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+		return obj.Text
+	end
+	local child = obj:FindFirstChildWhichIsA("TextLabel")
+	if child then
+		return child.Text
+	end
+	return nil
+end
 
 -------------------------------------------------
 -- UPDATE UI
@@ -110,15 +139,17 @@ task.spawn(function()
 
 		if statsGui and statsGui:FindFirstChild("BarsFrame") then
 			local levelObj = statsGui.BarsFrame:FindFirstChild("Level")
-			if levelObj then
-				LevelText.Text = "Level: " .. levelObj.Text
+			local txt = getText(levelObj)
+			if txt then
+				LevelText.Text = "Level: " .. txt
 			end
 		end
 
 		if spinnerGui and spinnerGui:FindFirstChild("Frame") then
 			local spinObj = spinnerGui.Frame:FindFirstChild("Spin")
-			if spinObj then
-				SpinText.Text = "Spin: " .. spinObj.Text
+			local txt = getText(spinObj)
+			if txt then
+				SpinText.Text = "Spin: " .. txt
 			end
 		end
 
@@ -127,27 +158,26 @@ task.spawn(function()
 end)
 
 -------------------------------------------------
--- AUTO SPIN (FIX THEO YÊU CẦU)
+-- AUTO SPIN
 -------------------------------------------------
 task.spawn(function()
 	while true do
-		local statsGui = player.PlayerGui:FindFirstChild("StatsGui")
+		if autoSpin then
+			local statsGui = player.PlayerGui:FindFirstChild("StatsGui")
 
-		if statsGui and statsGui:FindFirstChild("BarsFrame") then
-			local levelObj = statsGui.BarsFrame:FindFirstChild("Level")
+			if statsGui and statsGui:FindFirstChild("BarsFrame") then
+				local levelObj = statsGui.BarsFrame:FindFirstChild("Level")
+				local txt = getText(levelObj)
 
-			if levelObj then
-				local level = tonumber(levelObj.Text)
+				local level = tonumber(txt)
 
 				if level and level > 5 and not spinning then
 					spinning = true
 
-					-- spin 1 lần
 					pcall(function()
 						SpinRemote:InvokeServer()
 					end)
 
-					-- reset nhân vật
 					task.wait(1)
 					if player.Character then
 						player.Character:BreakJoints()
@@ -160,22 +190,20 @@ task.spawn(function()
 	end
 end)
 
--- reset trạng thái sau khi respawn
 player.CharacterAdded:Connect(function()
 	task.wait(1)
 	spinning = false
 end)
 
 -------------------------------------------------
--- AUTOFARM (GIỮ NGUYÊN)
+-- AUTOFARM
 -------------------------------------------------
 task.spawn(function()
 	while true do
 		if farmEXP then
-			local character = player.Character
 			local backpack = player:FindFirstChild("Backpack")
 
-			if character and backpack then
+			if backpack then
 				table.clear(moves)
 
 				for _, tool in ipairs(backpack:GetChildren()) do
@@ -184,16 +212,14 @@ task.spawn(function()
 					end
 				end
 
-				if #moves > 0 then
-					for _, move in ipairs(moves) do
-						L_1_:FireServer(move)
-					end
+				for _, move in ipairs(moves) do
+					L_1_:FireServer(move)
+				end
 
-					task.wait(0.05)
+				task.wait(0.05)
 
-					for _, move in ipairs(moves) do
-						L_2_:FireServer(move)
-					end
+				for _, move in ipairs(moves) do
+					L_2_:FireServer(move)
 				end
 			end
 		end
