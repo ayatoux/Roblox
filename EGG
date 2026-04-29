@@ -12,7 +12,7 @@ gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,220,0,200)
+frame.Size = UDim2.new(0,200,0,150)
 frame.Position = UDim2.new(0,20,0.4,0)
 frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 
@@ -22,24 +22,9 @@ title.Text = "Ayato Hub (Drag)"
 title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 
--- LEVEL DISPLAY
-local levelLabelUI = Instance.new("TextLabel", frame)
-levelLabelUI.Size = UDim2.new(1,0,0,25)
-levelLabelUI.Position = UDim2.new(0,0,0,30)
-levelLabelUI.Text = "Level: ..."
-levelLabelUI.TextColor3 = Color3.new(1,1,1)
-levelLabelUI.BackgroundTransparency = 1
-
--- SPIN DISPLAY
-local spinLabelUI = Instance.new("TextLabel", frame)
-spinLabelUI.Size = UDim2.new(1,0,0,25)
-spinLabelUI.Position = UDim2.new(0,0,0,55)
-spinLabelUI.Text = "Spins: ..."
-spinLabelUI.TextColor3 = Color3.new(1,1,1)
-spinLabelUI.BackgroundTransparency = 1
-
--- DRAG
+-- DRAG MOBILE
 local dragging, dragInput, dragStart, startPos
+
 title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
@@ -75,18 +60,18 @@ end)
 -- BUTTONS
 local farmBtn = Instance.new("TextButton", frame)
 farmBtn.Size = UDim2.new(1,-20,0,40)
-farmBtn.Position = UDim2.new(0,10,0,85)
+farmBtn.Position = UDim2.new(0,10,0,40)
 farmBtn.Text = "Auto Farm: OFF"
 
 local spinBtn = Instance.new("TextButton", frame)
 spinBtn.Size = UDim2.new(1,-20,0,40)
-spinBtn.Position = UDim2.new(0,10,0,135)
+spinBtn.Position = UDim2.new(0,10,0,90)
 spinBtn.Text = "Auto Spin: OFF"
 
 -- SETTINGS
 local autoFarm = false
 local autoSpin = false
-local spinning = false
+local lastLevel = 0
 
 -- SKILLS
 local skills = {
@@ -111,17 +96,6 @@ local function getLevel()
     return tonumber(string.match(lvlLabel.Text, "%d+")) or 1
 end
 
-local function getSpinCount()
-    local spinText = player:WaitForChild("PlayerGui")
-        :WaitForChild("Spinner")
-        :WaitForChild("Frame")
-        :WaitForChild("Spin")
-        :WaitForChild("TextLabel")
-
-    local text = spinText.Text -- ví dụ: "Spins: 10"
-    return tonumber(string.match(text, "%d+")) or 0
-end
-
 local function resetChar()
     local char = getChar()
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -130,7 +104,7 @@ local function resetChar()
     end
 end
 
--- BUTTON
+-- BUTTON TOGGLE
 farmBtn.MouseButton1Click:Connect(function()
     autoFarm = not autoFarm
     farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
@@ -141,19 +115,10 @@ spinBtn.MouseButton1Click:Connect(function()
     spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
 end)
 
--- UPDATE UI
-task.spawn(function()
-    while true do
-        levelLabelUI.Text = "Level: " .. getLevel()
-        spinLabelUI.Text = "Spins: " .. getSpinCount()
-        task.wait(0.5)
-    end
-end)
-
 -- AUTO FARM
 task.spawn(function()
     while true do
-        if autoFarm and not spinning then
+        if autoFarm then
             local char = getChar()
             local root = char:WaitForChild("HumanoidRootPart")
             local base = workspace:WaitForChild("Base")
@@ -161,35 +126,38 @@ task.spawn(function()
             root.CFrame = base.CFrame + Vector3.new(0,3,0)
 
             for _, skill in ipairs(skills) do
-                rs:WaitForChild("864144468Client")
-                  :WaitForChild("StartMove"):FireServer(skill)
+                game:GetService("ReplicatedStorage")
+                    :WaitForChild("864144468Client")
+                    :WaitForChild("StartMove"):FireServer(skill)
 
                 task.wait(0.1)
 
-                rs:WaitForChild("864144468Client")
-                  :WaitForChild("EndMove"):FireServer(skill)
+                game:GetService("ReplicatedStorage")
+                    :WaitForChild("864144468Client")
+                    :WaitForChild("EndMove"):FireServer(skill)
             end
         end
         task.wait(0.3)
     end
 end)
 
--- AUTO SPIN LOOP
+-- AUTO SPIN
 task.spawn(function()
     while true do
-        if autoSpin and not spinning then
+        if autoSpin then
             local lvl = getLevel()
 
-            if lvl >= 5 then
-                spinning = true
+            if lvl >= 5 and lvl ~= lastLevel then
+                lastLevel = lvl
 
-                spin:InvokeServer()
+                print("Spin tại level:", lvl)
+
+                pcall(function()
+                    spin:InvokeServer()
+                end)
+
                 task.wait(1)
-
                 resetChar()
-                task.wait(3)
-
-                spinning = false
             end
         end
         task.wait(1)
