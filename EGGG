@@ -38,10 +38,12 @@ spinLabelUI.Text = "Spins: ..."
 spinLabelUI.TextColor3 = Color3.new(1,1,1)
 spinLabelUI.BackgroundTransparency = 1
 
--- DRAG
+-- DRAG (fix dùng được cả PC + Mobile)
 local dragging, dragInput, dragStart, startPos
+
 title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.Touch 
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
         startPos = frame.Position
@@ -49,7 +51,8 @@ title.InputBegan:Connect(function(input)
 end)
 
 title.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.Touch 
+    or input.UserInputType == Enum.UserInputType.MouseMovement then
         dragInput = input
     end
 end)
@@ -67,7 +70,8 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
 end)
 
 title.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.Touch 
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = false
     end
 end)
@@ -93,6 +97,27 @@ local function getChar()
     return player.Character or player.CharacterAdded:Wait()
 end
 
+-- LẤY SKILL TỪ BACKPACK + CHARACTER
+local function getSkills()
+    local skillList = {}
+
+    local function scan(container)
+        for _, tool in ipairs(container:GetChildren()) do
+            if tool:IsA("Tool") then
+                table.insert(skillList, tool.Name)
+            end
+        end
+    end
+
+    scan(player:WaitForChild("Backpack"))
+    
+    if player.Character then
+        scan(player.Character)
+    end
+
+    return skillList
+end
+
 local function getLevel()
     local lvlLabel = player:WaitForChild("PlayerGui")
         :WaitForChild("StatsGui")
@@ -109,8 +134,7 @@ local function getSpinCount()
         :WaitForChild("Spin")
         :WaitForChild("TextLabel")
 
-    local text = spinText.Text
-    return tonumber(string.match(text, "%d+")) or 0
+    return tonumber(string.match(spinText.Text, "%d+")) or 0
 end
 
 local function resetChar()
@@ -141,7 +165,7 @@ task.spawn(function()
     end
 end)
 
--- AUTO FARM (Đã sửa đổi để lấy skill từ Backpack)
+-- AUTO FARM
 task.spawn(function()
     while true do
         if autoFarm and not spinning then
@@ -151,16 +175,17 @@ task.spawn(function()
 
             root.CFrame = base.CFrame + Vector3.new(0,3,0)
 
-            -- Quét các Tool trong Backpack và gửi Remote tương ứng với tên của nó
-            for _, item in ipairs(player.Backpack:GetChildren()) do
-                if item:IsA("Tool") then
-                    local skillName = item.Name
-                    
-                    local clientRemote = rs:WaitForChild("864144468Client")
-                    
-                    clientRemote:WaitForChild("StartMove"):FireServer(skillName)
+            local skills = getSkills()
+
+            if #skills > 0 then
+                for _, skill in ipairs(skills) do
+                    rs:WaitForChild("864144468Client")
+                      :WaitForChild("StartMove"):FireServer(skill)
+
                     task.wait(0.1)
-                    clientRemote:WaitForChild("EndMove"):FireServer(skillName)
+
+                    rs:WaitForChild("864144468Client")
+                      :WaitForChild("EndMove"):FireServer(skill)
                 end
             end
         end
@@ -168,13 +193,14 @@ task.spawn(function()
     end
 end)
 
--- AUTO SPIN LOOP
+-- AUTO SPIN
 task.spawn(function()
     while true do
         if autoSpin and not spinning then
             local lvl = getLevel()
+            local spins = getSpinCount()
 
-            if lvl >= 5 then
+            if lvl >= 5 and spins > 0 then
                 spinning = true
 
                 spin:InvokeServer()
