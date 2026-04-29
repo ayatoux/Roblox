@@ -1,0 +1,165 @@
+--// SERVICES
+local player = game.Players.LocalPlayer
+local rs = game:GetService("ReplicatedStorage")
+
+--// REMOTE
+local spin = rs:WaitForChild("Client"):WaitForChild("Spin")
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AyatoHub"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,200,0,150)
+frame.Position = UDim2.new(0,20,0.4,0)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "Ayato Hub (Drag)"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+
+-- DRAG MOBILE
+local dragging, dragInput, dragStart, startPos
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+title.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- BUTTONS
+local farmBtn = Instance.new("TextButton", frame)
+farmBtn.Size = UDim2.new(1,-20,0,40)
+farmBtn.Position = UDim2.new(0,10,0,40)
+farmBtn.Text = "Auto Farm: OFF"
+
+local spinBtn = Instance.new("TextButton", frame)
+spinBtn.Size = UDim2.new(1,-20,0,40)
+spinBtn.Position = UDim2.new(0,10,0,90)
+spinBtn.Text = "Auto Spin: OFF"
+
+-- SETTINGS
+local autoFarm = false
+local autoSpin = false
+local lastLevel = 0
+
+-- SKILLS
+local skills = {
+    "Demonstration",
+    "Rocket Blast",
+    "Soaring Rocket",
+    "Firework Traversal",
+    "Recursive Fireworks"
+}
+
+-- FUNCTIONS
+local function getChar()
+    return player.Character or player.CharacterAdded:Wait()
+end
+
+local function getLevel()
+    local lvlLabel = player:WaitForChild("PlayerGui")
+        :WaitForChild("StatsGui")
+        :WaitForChild("BarsFrame")
+        :WaitForChild("Level")
+
+    return tonumber(string.match(lvlLabel.Text, "%d+")) or 1
+end
+
+local function resetChar()
+    local char = getChar()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.Health = 0
+    end
+end
+
+-- BUTTON TOGGLE
+farmBtn.MouseButton1Click:Connect(function()
+    autoFarm = not autoFarm
+    farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
+end)
+
+spinBtn.MouseButton1Click:Connect(function()
+    autoSpin = not autoSpin
+    spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
+end)
+
+-- AUTO FARM
+task.spawn(function()
+    while true do
+        if autoFarm then
+            local char = getChar()
+            local root = char:WaitForChild("HumanoidRootPart")
+            local base = workspace:WaitForChild("Base")
+
+            root.CFrame = base.CFrame + Vector3.new(0,3,0)
+
+            for _, skill in ipairs(skills) do
+                game:GetService("ReplicatedStorage")
+                    :WaitForChild("864144468Client")
+                    :WaitForChild("StartMove"):FireServer(skill)
+
+                task.wait(0.1)
+
+                game:GetService("ReplicatedStorage")
+                    :WaitForChild("864144468Client")
+                    :WaitForChild("EndMove"):FireServer(skill)
+            end
+        end
+        task.wait(0.3)
+    end
+end)
+
+-- AUTO SPIN
+task.spawn(function()
+    while true do
+        if autoSpin then
+            local lvl = getLevel()
+
+            if lvl >= 5 and lvl ~= lastLevel then
+                lastLevel = lvl
+
+                print("Spin tại level:", lvl)
+
+                pcall(function()
+                    spin:InvokeServer()
+                end)
+
+                task.wait(1)
+                resetChar()
+            end
+        end
+        task.wait(1)
+    end
+end)
