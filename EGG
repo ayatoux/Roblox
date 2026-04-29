@@ -2,8 +2,12 @@
 local player = game.Players.LocalPlayer
 local rs = game:GetService("ReplicatedStorage")
 
---// REMOTE SPIN
+--// REMOTES
 local spin = rs:WaitForChild("Client"):WaitForChild("Spin")
+
+local moveFolder = rs:WaitForChild("864144468Client")
+local startMove = moveFolder:WaitForChild("StartMove")
+local endMove = moveFolder:WaitForChild("EndMove")
 
 --// GUI
 local gui = Instance.new("ScreenGui")
@@ -22,8 +26,9 @@ title.Text = "Ayato Hub (Drag)"
 title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 
--- DRAG
+-- DRAG MOBILE
 local dragging, dragInput, dragStart, startPos
+
 title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
@@ -56,7 +61,7 @@ title.InputEnded:Connect(function(input)
     end
 end)
 
--- DISPLAY
+-- DISPLAY LEVEL
 local levelUI = Instance.new("TextLabel", frame)
 levelUI.Size = UDim2.new(1,0,0,25)
 levelUI.Position = UDim2.new(0,0,0,30)
@@ -64,6 +69,7 @@ levelUI.Text = "Level: ..."
 levelUI.TextColor3 = Color3.new(1,1,1)
 levelUI.BackgroundTransparency = 1
 
+-- DISPLAY SPIN
 local spinUI = Instance.new("TextLabel", frame)
 spinUI.Size = UDim2.new(1,0,0,25)
 spinUI.Position = UDim2.new(0,0,0,55)
@@ -71,7 +77,7 @@ spinUI.Text = "Spins: ..."
 spinUI.TextColor3 = Color3.new(1,1,1)
 spinUI.BackgroundTransparency = 1
 
--- BUTTON
+-- BUTTONS
 local farmBtn = Instance.new("TextButton", frame)
 farmBtn.Size = UDim2.new(1,-20,0,40)
 farmBtn.Position = UDim2.new(0,10,0,85)
@@ -93,8 +99,8 @@ local function getChar()
 end
 
 local function getLevel()
-    local lvlLabel = player.PlayerGui.StatsGui.BarsFrame.Level
-    return tonumber(string.match(lvlLabel.Text, "%d+")) or 1
+    local txt = player.PlayerGui.StatsGui.BarsFrame.Level.Text
+    return tonumber(string.match(txt, "%d+")) or 1
 end
 
 local function getSpinCount()
@@ -110,27 +116,20 @@ local function resetChar()
     end
 end
 
--- 🔥 LẤY TẤT CẢ SKILL (Tool)
+-- 🔥 AUTO DETECT SKILL
 local function getSkills()
-    local char = getChar()
     local skills = {}
 
-    for _, v in pairs(player.Backpack:GetChildren()) do
-        if v:IsA("Tool") then
-            table.insert(skills, v)
-        end
-    end
-
-    for _, v in pairs(char:GetChildren()) do
-        if v:IsA("Tool") then
-            table.insert(skills, v)
+    for _, v in pairs(moveFolder:GetChildren()) do
+        if v:IsA("Folder") or v:IsA("ModuleScript") then
+            table.insert(skills, v.Name)
         end
     end
 
     return skills
 end
 
--- BUTTON
+-- BUTTON TOGGLE
 farmBtn.MouseButton1Click:Connect(function()
     autoFarm = not autoFarm
     farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
@@ -150,7 +149,7 @@ task.spawn(function()
     end
 end)
 
--- AUTO FARM (dùng skill hiện có)
+-- AUTO FARM
 task.spawn(function()
     while true do
         if autoFarm and not spinning then
@@ -162,15 +161,12 @@ task.spawn(function()
 
             local skills = getSkills()
 
-            for _, tool in ipairs(skills) do
-                char.Humanoid:EquipTool(tool)
-                task.wait(0.1)
-
+            for _, skill in ipairs(skills) do
                 pcall(function()
-                    tool:Activate()
+                    startMove:FireServer(skill)
+                    task.wait(0.1)
+                    endMove:FireServer(skill)
                 end)
-
-                task.wait(0.2)
             end
         end
         task.wait(0.3)
