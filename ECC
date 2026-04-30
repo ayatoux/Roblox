@@ -6,20 +6,15 @@ local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
 
---// CONFIG DISCORD
+--// CONFIG
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1038744090034065479/yPluKIedC-q9iTX1Hk4-iqsqrj5tc7EE-4on3H-Up9wHo4cthhY4O6S-PhyIkmutz-IQ"
 local USER_ID = "547049166564491315"
 
 --// VARIABLES
-local autoFarm = false
-local autoSpin = false
-local autoIntro = false
-local autoElement = false
-
+local autoFarm, autoSpin, autoIntro, autoElement = false,false,false,false
 local selectedElements = {}
 local moves = {}
 
---// REQUEST
 local request = request or http_request or syn and syn.request
 
 --// REMOTES
@@ -53,22 +48,44 @@ local rarityTable = {
 	["Cosmic"]="Legend"
 }
 
-local colors = {
-	Myth = 16711680,
-	Legend = 16766720
-}
+local colors = {Myth=16711680, Legend=16766720}
 
---// GUI
+--// GUI ROOT
 local gui = Instance.new("ScreenGui", game.CoreGui)
+
+-- 🔘 TOGGLE BUTTON (luôn hiện)
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0,120,0,35)
+toggleBtn.Position = UDim2.new(0,10,0,200)
+toggleBtn.Text = "OPEN MENU"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(20,20,20)
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+
+-- 📦 MAIN FRAME
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,220,0,420)
+frame.Size = UDim2.new(0,220,0,300)
 frame.Position = UDim2.new(0.1,0,0.2,0)
 frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 frame.Active = true
 frame.Draggable = true
+frame.Visible = false
 
+-- 📦 DROPDOWN (BÊN PHẢI)
+local dropFrame = Instance.new("ScrollingFrame", gui)
+dropFrame.Size = UDim2.new(0,200,0,300)
+dropFrame.Position = UDim2.new(0.1,230,0.2,0)
+dropFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+dropFrame.Visible = false
+dropFrame.ScrollBarThickness = 6
+
+local layout = Instance.new("UIListLayout", dropFrame)
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	dropFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y)
+end)
+
+--// CREATE BUTTON
 local function btn(text,y)
-	local b = Instance.new("TextButton",frame)
+	local b = Instance.new("TextButton", frame)
 	b.Size = UDim2.new(1,-10,0,35)
 	b.Position = UDim2.new(0,5,0,y)
 	b.Text = text
@@ -77,31 +94,32 @@ local function btn(text,y)
 	return b
 end
 
+-- LABELS
 local levelLabel = btn("Level: ?",5)
 local spinLabel = btn("Spin: ?",40)
 local elementLabel = btn("Element: ?",75)
 
+-- BUTTONS
 local farmBtn = btn("Auto Farm: OFF",110)
-local spinBtn = btn("Auto Spin: OFF",150)
-local elementBtn = btn("Auto Element: OFF",190)
-local introBtn = btn("Skip Intro: OFF",230)
-local dropBtn = btn("Select Elements ▼",270)
+local spinBtn = btn("Auto Spin: OFF",145)
+local elementBtn = btn("Auto Element: OFF",180)
+local introBtn = btn("Skip Intro: OFF",215)
+local openDropBtn = btn("Select Elements ▶",250)
 
---// DROPDOWN
-local dropFrame = Instance.new("ScrollingFrame",frame)
-dropFrame.Size = UDim2.new(1,-10,0,130)
-dropFrame.Position = UDim2.new(0,5,0,310)
-dropFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-dropFrame.Visible = false
-dropFrame.ScrollBarThickness = 6
-
-local layout = Instance.new("UIListLayout",dropFrame)
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	dropFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y)
+--// TOGGLE GUI
+toggleBtn.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+	dropFrame.Visible = false
 end)
 
+--// DROPDOWN TOGGLE
+openDropBtn.MouseButton1Click:Connect(function()
+	dropFrame.Visible = not dropFrame.Visible
+end)
+
+--// ELEMENT BUTTONS
 for _,el in ipairs(allElements) do
-	local b = Instance.new("TextButton",dropFrame)
+	local b = Instance.new("TextButton", dropFrame)
 	b.Size = UDim2.new(1,0,0,25)
 	b.Text = "[ ] "..el
 	b.BackgroundColor3 = Color3.fromRGB(60,60,60)
@@ -117,10 +135,6 @@ for _,el in ipairs(allElements) do
 		end
 	end)
 end
-
-dropBtn.MouseButton1Click:Connect(function()
-	dropFrame.Visible = not dropFrame.Visible
-end)
 
 --// BUTTON EVENTS
 farmBtn.MouseButton1Click:Connect(function()
@@ -145,26 +159,22 @@ end)
 
 --// GET DATA
 local function getSpin()
-	local s,r = pcall(function()
-		return GetSpinsRemote:InvokeServer()
-	end)
+	local s,r = pcall(function() return GetSpinsRemote:InvokeServer() end)
 	return s and tonumber(r) or 0
 end
 
 local function getElement()
-	local s,r = pcall(function()
-		return GetElementRemote:InvokeServer()
-	end)
+	local s,r = pcall(function() return GetElementRemote:InvokeServer() end)
 	return s and tostring(r) or "?"
 end
 
---// DISCORD EMBED
+--// DISCORD
 local function sendEmbed(el, spins)
 	local rarity = rarityTable[el]
 	if not rarity then return end
 
 	local data = {
-		content = rarity == "Myth" and ("<@"..USER_ID.."> 🔥 MYTH!") or nil,
+		content = rarity=="Myth" and ("<@"..USER_ID.."> 🔥 MYTH!") or nil,
 		embeds = {{
 			title = "Element Roll",
 			description = "**"..el.."**",
@@ -193,9 +203,7 @@ task.spawn(function()
 			if backpack then
 				table.clear(moves)
 				for _,t in ipairs(backpack:GetChildren()) do
-					if t:IsA("Tool") then
-						table.insert(moves,t.Name)
-					end
+					if t:IsA("Tool") then table.insert(moves,t.Name) end
 				end
 				for _,m in ipairs(moves) do StartMove:FireServer(m) end
 				task.wait(0.05)
@@ -219,7 +227,6 @@ task.spawn(function()
 					task.wait(0.15)
 				else
 					sendEmbed(el, spins)
-					print("Đạt:", el)
 					autoElement = false
 				end
 			end
@@ -228,12 +235,12 @@ task.spawn(function()
 	end
 end)
 
---// AUTO SPIN LEVEL
+--// AUTO SPIN
 task.spawn(function()
 	while true do
 		if autoSpin then
 			local lvl = tonumber(string.match(player.PlayerGui.StatsGui.BarsFrame.Level.Text,"%d+"))
-			if lvl and lvl >= 6 and getSpin() > 0 then
+			if lvl and lvl>=6 and getSpin()>0 then
 				SpinRemote:InvokeServer()
 				task.wait(1)
 				player.Character:BreakJoints()
@@ -247,9 +254,7 @@ end)
 --// INTRO
 task.spawn(function()
 	while true do
-		if autoIntro then
-			IntroRemote:InvokeServer()
-		end
+		if autoIntro then IntroRemote:InvokeServer() end
 		task.wait(1)
 	end
 end)
