@@ -9,8 +9,19 @@ local player = Players.LocalPlayer
 local autoFarm = false
 local autoSpin = false
 local autoIntro = false
+local autoElement = false
 
 local moves = {}
+local selectedElements = {}
+
+--// ELEMENT LIST
+local allElements = {
+	"Dragon","Heaven's Wrath","Arc of the Elements","Time","Telekinesis","Necromancer","Destruction","Spectre","Acceleration","Dragon Blade","Vampire",
+	"Solar","Phoenix","Hydra","Lunar","Illusion","Prism","Cosmic",
+	"Mechanization","Lava","Sound","Chaos","Radiation","Plasma","Armament",
+	"Nova","Metal","Blood","Explosion",
+	"Fire","Water","Poison","Sand","Dark","Light","Ice","Lightning","Wood","Earth","Wind"
+}
 
 --// REMOTES
 local clientFolder = ReplicatedStorage:WaitForChild(player.UserId .. "Client")
@@ -20,45 +31,93 @@ local EndMove = clientFolder:WaitForChild("EndMove")
 local SpinRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Spin")
 local IntroRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Intro")
 local GetSpinsRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("GetSpins")
+local GetElementRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("GetElement")
 
 --// GUI
 local gui = Instance.new("ScreenGui", game.CoreGui)
 gui.Name = "MobileGUI"
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 200, 0, 250)
+frame.Size = UDim2.new(0, 220, 0, 420)
 frame.Position = UDim2.new(0.1, 0, 0.2, 0)
 frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 frame.Active = true
 frame.Draggable = true
 
 local function createButton(text, y)
-	local btn = Instance.new("TextButton", frame)
-	btn.Size = UDim2.new(1, -10, 0, 35)
-	btn.Position = UDim2.new(0, 5, 0, y)
-	btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-	btn.TextColor3 = Color3.new(1,1,1)
-	btn.Text = text
-	return btn
+	local b = Instance.new("TextButton", frame)
+	b.Size = UDim2.new(1, -10, 0, 35)
+	b.Position = UDim2.new(0, 5, 0, y)
+	b.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Text = text
+	return b
 end
 
+--// LABELS
 local levelLabel = Instance.new("TextLabel", frame)
 levelLabel.Size = UDim2.new(1, -10, 0, 25)
-levelLabel.Position = UDim2.new(0, 5, 0, 5)
-levelLabel.TextColor3 = Color3.new(1,1,1)
+levelLabel.Position = UDim2.new(0,5,0,5)
 levelLabel.BackgroundTransparency = 1
-levelLabel.Text = "Level: ?"
+levelLabel.TextColor3 = Color3.new(1,1,1)
 
 local spinLabel = Instance.new("TextLabel", frame)
 spinLabel.Size = UDim2.new(1, -10, 0, 25)
-spinLabel.Position = UDim2.new(0, 5, 0, 30)
-spinLabel.TextColor3 = Color3.new(1,1,1)
+spinLabel.Position = UDim2.new(0,5,0,30)
 spinLabel.BackgroundTransparency = 1
-spinLabel.Text = "Spin: ?"
+spinLabel.TextColor3 = Color3.new(1,1,1)
 
-local farmBtn = createButton("Auto Farm: OFF", 60)
-local spinBtn = createButton("Auto Spin: OFF", 100)
-local introBtn = createButton("Skip Intro: OFF", 140)
+local elementLabel = Instance.new("TextLabel", frame)
+elementLabel.Size = UDim2.new(1, -10, 0, 25)
+elementLabel.Position = UDim2.new(0,5,0,55)
+elementLabel.BackgroundTransparency = 1
+elementLabel.TextColor3 = Color3.new(1,1,1)
+
+--// BUTTONS
+local farmBtn = createButton("Auto Farm: OFF", 90)
+local spinBtn = createButton("Auto Spin: OFF", 130)
+local elementBtn = createButton("Auto Element: OFF", 170)
+local introBtn = createButton("Skip Intro: OFF", 210)
+local dropdownBtn = createButton("Select Elements ▼", 250)
+
+--// DROPDOWN
+local dropdownFrame = Instance.new("ScrollingFrame", frame)
+dropdownFrame.Size = UDim2.new(1, -10, 0, 140)
+dropdownFrame.Position = UDim2.new(0, 5, 0, 290)
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+dropdownFrame.Visible = false
+dropdownFrame.CanvasSize = UDim2.new(0,0,0,0)
+dropdownFrame.ScrollBarThickness = 6
+
+local layout = Instance.new("UIListLayout", dropdownFrame)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	dropdownFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y)
+end)
+
+--// CREATE ELEMENT BUTTONS
+for _, element in ipairs(allElements) do
+	local btn = Instance.new("TextButton", dropdownFrame)
+	btn.Size = UDim2.new(1, 0, 0, 25)
+	btn.Text = "[ ] " .. element
+	btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+	btn.TextColor3 = Color3.new(1,1,1)
+
+	btn.MouseButton1Click:Connect(function()
+		if selectedElements[element] then
+			selectedElements[element] = nil
+			btn.Text = "[ ] " .. element
+		else
+			selectedElements[element] = true
+			btn.Text = "[✓] " .. element
+		end
+	end)
+end
+
+dropdownBtn.MouseButton1Click:Connect(function()
+	dropdownFrame.Visible = not dropdownFrame.Visible
+end)
 
 --// BUTTON EVENTS
 farmBtn.MouseButton1Click:Connect(function()
@@ -71,63 +130,57 @@ spinBtn.MouseButton1Click:Connect(function()
 	spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
 end)
 
+elementBtn.MouseButton1Click:Connect(function()
+	autoElement = not autoElement
+	elementBtn.Text = "Auto Element: " .. (autoElement and "ON" or "OFF")
+end)
+
 introBtn.MouseButton1Click:Connect(function()
 	autoIntro = not autoIntro
 	introBtn.Text = "Skip Intro: " .. (autoIntro and "ON" or "OFF")
 end)
 
---// GET LEVEL
+--// DATA
 local function getLevel()
-	local success, result = pcall(function()
+	local s,r = pcall(function()
 		return player.PlayerGui.StatsGui.BarsFrame.Level.Text
 	end)
-	return success and result or "?"
+	return s and r or "?"
 end
 
---// GET SPIN (SERVER FIRST)
 local function getSpin()
-	local success, result = pcall(function()
+	local s,r = pcall(function()
 		return GetSpinsRemote:InvokeServer()
 	end)
+	return s and r and tostring(r) or "?"
+end
 
-	if success and result then
-		return tostring(result)
-	end
-
-	-- fallback GUI
-	local success2, result2 = pcall(function()
-		return player.PlayerGui.Spinner.Frame.Spin.TextLabel.Text
+local function getElement()
+	local s,r = pcall(function()
+		return GetElementRemote:InvokeServer()
 	end)
-
-	return success2 and result2 or "?"
+	return s and r and tostring(r) or "?"
 end
 
 --// AUTOFARM
 task.spawn(function()
 	while true do
 		if autoFarm then
-			local character = player.Character
 			local backpack = player:FindFirstChild("Backpack")
-
-			if character and backpack then
+			if backpack then
 				table.clear(moves)
-
-				for _, tool in ipairs(backpack:GetChildren()) do
+				for _,tool in ipairs(backpack:GetChildren()) do
 					if tool:IsA("Tool") then
 						table.insert(moves, tool.Name)
 					end
 				end
 
-				if #moves > 0 then
-					for _, move in ipairs(moves) do
-						StartMove:FireServer(move)
-					end
-
-					task.wait(0.05)
-
-					for _, move in ipairs(moves) do
-						EndMove:FireServer(move)
-					end
+				for _,m in ipairs(moves) do
+					StartMove:FireServer(m)
+				end
+				task.wait(0.05)
+				for _,m in ipairs(moves) do
+					EndMove:FireServer(m)
 				end
 			end
 		end
@@ -135,25 +188,42 @@ task.spawn(function()
 	end
 end)
 
---// AUTOSPIN
+--// ⚡ AUTO ELEMENT (MULTI SELECT)
+task.spawn(function()
+	while true do
+		if autoElement then
+			local spins = tonumber(getSpin())
+
+			if spins and spins > 0 then
+				local current = getElement()
+
+				if not selectedElements[current] then
+					SpinRemote:InvokeServer()
+					task.wait(0.15)
+				else
+					autoElement = false
+					elementBtn.Text = "Auto Element: DONE"
+					print("Đã đạt:", current)
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end)
+
+--// AUTO SPIN (LEVEL)
 task.spawn(function()
 	while true do
 		if autoSpin then
-			local levelText = getLevel()
-			local level = tonumber(string.match(levelText, "%d+"))
+			local lvl = tonumber(string.match(getLevel(), "%d+"))
 			local spins = tonumber(getSpin())
 
-			if level and level >= 6 and spins and spins > 0 then
-				pcall(function()
-					SpinRemote:InvokeServer()
-				end)
-
+			if lvl and lvl >= 6 and spins and spins > 0 then
+				SpinRemote:InvokeServer()
 				task.wait(1)
-
 				if player.Character then
 					player.Character:BreakJoints()
 				end
-
 				task.wait(3)
 			end
 		end
@@ -161,31 +231,24 @@ task.spawn(function()
 	end
 end)
 
---// AUTO INTRO
+--// INTRO
 task.spawn(function()
 	while true do
 		if autoIntro then
-			pcall(function()
-				IntroRemote:InvokeServer()
-			end)
+			IntroRemote:InvokeServer()
 		end
 		task.wait(1)
 	end
 end)
 
---// UPDATE UI
+--// UI UPDATE
 task.spawn(function()
 	while true do
 		levelLabel.Text = "Level: " .. getLevel()
 		spinLabel.Text = "Spin: " .. getSpin()
-		task.wait(0.5)
+		elementLabel.Text = "Element: " .. getElement()
+		task.wait(0.3)
 	end
-end)
-
---// RESPAWN FIX
-player.CharacterAdded:Connect(function()
-	task.wait(1)
-	print("Script vẫn chạy sau respawn")
 end)
 
 --// ANTI AFK
