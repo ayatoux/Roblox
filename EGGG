@@ -1,222 +1,299 @@
-```lua
 --// SERVICES
-local player = game.Players.LocalPlayer
-local rs = game:GetService("ReplicatedStorage")
-local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
 
---// REMOTE
-local spin = rs:WaitForChild("Client"):WaitForChild("Spin")
+local player = Players.LocalPlayer
 
---// GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "AyatoHub"
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,220,0,200)
-frame.Position = UDim2.new(0,20,0.4,0)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0,30)
-title.Text = "Ayato Hub (Drag)"
-title.TextColor3 = Color3.new(1,1,1)
-title.BackgroundTransparency = 1
-
--- LEVEL
-local levelLabelUI = Instance.new("TextLabel", frame)
-levelLabelUI.Size = UDim2.new(1,0,0,25)
-levelLabelUI.Position = UDim2.new(0,0,0,30)
-levelLabelUI.Text = "Level: ..."
-levelLabelUI.TextColor3 = Color3.new(1,1,1)
-levelLabelUI.BackgroundTransparency = 1
-
--- SPIN
-local spinLabelUI = Instance.new("TextLabel", frame)
-spinLabelUI.Size = UDim2.new(1,0,0,25)
-spinLabelUI.Position = UDim2.new(0,0,0,55)
-spinLabelUI.Text = "Spins: ..."
-spinLabelUI.TextColor3 = Color3.new(1,1,1)
-spinLabelUI.BackgroundTransparency = 1
-
--- DRAG (PC + MOBILE)
-local dragging, dragInput, dragStart, startPos
-
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch 
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
-end)
-
-title.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch 
-    or input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
-title.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch 
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- BUTTONS
-local farmBtn = Instance.new("TextButton", frame)
-farmBtn.Size = UDim2.new(1,-20,0,40)
-farmBtn.Position = UDim2.new(0,10,0,85)
-farmBtn.Text = "Auto Farm: OFF"
-
-local spinBtn = Instance.new("TextButton", frame)
-spinBtn.Size = UDim2.new(1,-20,0,40)
-spinBtn.Position = UDim2.new(0,10,0,135)
-spinBtn.Text = "Auto Spin: OFF"
-
--- SETTINGS
+--// VARIABLES
 local autoFarm = false
 local autoSpin = false
-local spinning = false
+local autoIntro = false
+local autoElement = false
 
--- FUNCTIONS
-local function getChar()
-    return player.Character or player.CharacterAdded:Wait()
+local moves = {}
+local selectedElements = {}
+
+--// WEBHOOK
+local webhookURL = "YOUR_WEBHOOK_URL_HERE"
+local spinHistory = {}
+
+--// ELEMENT LIST
+local allElements = {
+	"Dragon","Heaven's Wrath","Arc of the Elements","Time","Telekinesis","Necromancer","Destruction","Spectre","Acceleration","Dragon Blade","Vampire",
+	"Solar","Phoenix","Hydra","Lunar","Illusion","Prism","Cosmic",
+	"Mechanization","Lava","Sound","Chaos","Radiation","Plasma","Armament",
+	"Nova","Metal","Blood","Explosion",
+	"Fire","Water","Poison","Sand","Dark","Light","Ice","Lightning","Wood","Earth","Wind"
+}
+
+--// REMOTES
+local clientFolder = ReplicatedStorage:WaitForChild(player.UserId .. "Client")
+local StartMove = clientFolder:WaitForChild("StartMove")
+local EndMove = clientFolder:WaitForChild("EndMove")
+
+local SpinRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Spin")
+local IntroRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Intro")
+local GetSpinsRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("GetSpins")
+local GetElementRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("GetElement")
+
+--// GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "MobileGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 420)
+frame.Position = UDim2.new(0.1, 0, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Active = true
+frame.Draggable = true
+
+local function createButton(text, y)
+	local b = Instance.new("TextButton", frame)
+	b.Size = UDim2.new(1, -10, 0, 35)
+	b.Position = UDim2.new(0, 5, 0, y)
+	b.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Text = text
+	return b
 end
 
-local function getLevel()
-    local lvlLabel = player:WaitForChild("PlayerGui")
-        :WaitForChild("StatsGui")
-        :WaitForChild("BarsFrame")
-        :WaitForChild("Level")
+--// LABELS
+local levelLabel = Instance.new("TextLabel", frame)
+levelLabel.Size = UDim2.new(1, -10, 0, 25)
+levelLabel.Position = UDim2.new(0,5,0,5)
+levelLabel.BackgroundTransparency = 1
+levelLabel.TextColor3 = Color3.new(1,1,1)
 
-    return tonumber(string.match(lvlLabel.Text, "%d+")) or 1
+local spinLabel = Instance.new("TextLabel", frame)
+spinLabel.Size = UDim2.new(1, -10, 0, 25)
+spinLabel.Position = UDim2.new(0,5,0,30)
+spinLabel.BackgroundTransparency = 1
+spinLabel.TextColor3 = Color3.new(1,1,1)
+
+local elementLabel = Instance.new("TextLabel", frame)
+elementLabel.Size = UDim2.new(1, -10, 0, 25)
+elementLabel.Position = UDim2.new(0,5,0,55)
+elementLabel.BackgroundTransparency = 1
+elementLabel.TextColor3 = Color3.new(1,1,1)
+
+--// BUTTONS
+local farmBtn = createButton("Auto Farm: OFF", 90)
+local spinBtn = createButton("Auto Spin: OFF", 130)
+local elementBtn = createButton("Auto Element: OFF", 170)
+local introBtn = createButton("Skip Intro: OFF", 210)
+local dropdownBtn = createButton("Select Elements ▼", 250)
+
+--// DROPDOWN
+local dropdownFrame = Instance.new("ScrollingFrame", frame)
+dropdownFrame.Size = UDim2.new(1, -10, 0, 140)
+dropdownFrame.Position = UDim2.new(0, 5, 0, 290)
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+dropdownFrame.Visible = false
+dropdownFrame.CanvasSize = UDim2.new(0,0,0,0)
+dropdownFrame.ScrollBarThickness = 6
+
+local layout = Instance.new("UIListLayout", dropdownFrame)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	dropdownFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y)
+end)
+
+--// CREATE ELEMENT BUTTONS
+for _, element in ipairs(allElements) do
+	local btn = Instance.new("TextButton", dropdownFrame)
+	btn.Size = UDim2.new(1, 0, 0, 25)
+	btn.Text = "[ ] " .. element
+	btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+	btn.TextColor3 = Color3.new(1,1,1)
+
+	btn.MouseButton1Click:Connect(function()
+		if selectedElements[element] then
+			selectedElements[element] = nil
+			btn.Text = "[ ] " .. element
+		else
+			selectedElements[element] = true
+			btn.Text = "[✓] " .. element
+		end
+	end)
 end
 
-local function getSpinCount()
-    local spinText = player:WaitForChild("PlayerGui")
-        :WaitForChild("Spinner")
-        :WaitForChild("Frame")
-        :WaitForChild("Spin")
-        :WaitForChild("TextLabel")
+dropdownBtn.MouseButton1Click:Connect(function()
+	dropdownFrame.Visible = not dropdownFrame.Visible
+end)
 
-    return tonumber(string.match(spinText.Text, "%d+")) or 0
-end
-
-local function resetChar()
-    local char = getChar()
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.Health = 0
-    end
-end
-
--- BUTTON
+--// BUTTON EVENTS
 farmBtn.MouseButton1Click:Connect(function()
-    autoFarm = not autoFarm
-    farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
+	autoFarm = not autoFarm
+	farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
 end)
 
 spinBtn.MouseButton1Click:Connect(function()
-    autoSpin = not autoSpin
-    spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
+	autoSpin = not autoSpin
+	spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
 end)
 
--- UPDATE UI
+elementBtn.MouseButton1Click:Connect(function()
+	autoElement = not autoElement
+	elementBtn.Text = "Auto Element: " .. (autoElement and "ON" or "OFF")
+end)
+
+introBtn.MouseButton1Click:Connect(function()
+	autoIntro = not autoIntro
+	introBtn.Text = "Skip Intro: " .. (autoIntro and "ON" or "OFF")
+end)
+
+--// DATA
+local function getLevel()
+	local s,r = pcall(function()
+		return player.PlayerGui.StatsGui.BarsFrame.Level.Text
+	end)
+	return s and r or "?"
+end
+
+local function getSpin()
+	local s,r = pcall(function()
+		return GetSpinsRemote:InvokeServer()
+	end)
+	return s and r and tostring(r) or "?"
+end
+
+local function getElement()
+	local s,r = pcall(function()
+		return GetElementRemote:InvokeServer()
+	end)
+	return s and r and tostring(r) or "?"
+end
+
+--// WEBHOOK SEND
+local function sendWebhook(logTable)
+	local content = "🎯 **Spin Log (5 lần gần nhất):**\n"
+
+	for i, v in ipairs(logTable) do
+		content = content .. i .. ". " .. v .. "\n"
+	end
+
+	local data = {
+		["content"] = content
+	}
+
+	local json = HttpService:JSONEncode(data)
+
+	pcall(function()
+		request({
+			Url = webhookURL,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json"
+			},
+			Body = json
+		})
+	end)
+end
+
+--// AUTOFARM
 task.spawn(function()
-    while true do
-        levelLabelUI.Text = "Level: " .. getLevel()
-        spinLabelUI.Text = "Spins: " .. getSpinCount()
-        task.wait(0.5)
-    end
+	while true do
+		if autoFarm then
+			local backpack = player:FindFirstChild("Backpack")
+			if backpack then
+				table.clear(moves)
+				for _,tool in ipairs(backpack:GetChildren()) do
+					if tool:IsA("Tool") then
+						table.insert(moves, tool.Name)
+					end
+				end
+
+				for _,m in ipairs(moves) do
+					StartMove:FireServer(m)
+				end
+				task.wait(0.05)
+				for _,m in ipairs(moves) do
+					EndMove:FireServer(m)
+				end
+			end
+		end
+		task.wait(0.15)
+	end
 end)
 
--- AUTO FARM (EQUIP + REMOTE)
+--// ⚡ AUTO ELEMENT (MULTI SELECT + LOG)
 task.spawn(function()
-    while true do
-        if autoFarm and not spinning then
-            local char = getChar()
-            local root = char:WaitForChild("HumanoidRootPart")
-            local hum = char:WaitForChild("Humanoid")
-            local base = workspace:WaitForChild("Base")
+	while true do
+		if autoElement then
+			local spins = tonumber(getSpin())
 
-            -- teleport
-            root.CFrame = base.CFrame + Vector3.new(0,3,0)
+			if spins and spins > 0 then
+				SpinRemote:InvokeServer()
+				task.wait(0.2)
 
-            -- lấy tool
-            local tools = {}
+				local after = getElement()
 
-            for _, v in ipairs(player.Backpack:GetChildren()) do
-                if v:IsA("Tool") then
-                    table.insert(tools, v)
-                end
-            end
+				-- lưu log
+				table.insert(spinHistory, after)
 
-            for _, v in ipairs(char:GetChildren()) do
-                if v:IsA("Tool") then
-                    table.insert(tools, v)
-                end
-            end
+				-- đủ 5 lần gửi webhook
+				if #spinHistory >= 5 then
+					sendWebhook(spinHistory)
+					table.clear(spinHistory)
+				end
 
-            -- dùng remote sau khi equip
-            for _, tool in ipairs(tools) do
-                if tool and tool.Parent then
-                    hum:EquipTool(tool)
-                    task.wait(0.15)
-
-                    local skillName = tool.Name
-
-                    rs:WaitForChild("864144468Client")
-                        :WaitForChild("StartMove"):FireServer(skillName)
-
-                    task.wait(0.15)
-
-                    rs:WaitForChild("864144468Client")
-                        :WaitForChild("EndMove"):FireServer(skillName)
-
-                    task.wait(0.2)
-                end
-            end
-        end
-        task.wait(0.3)
-    end
+				-- nếu trúng element đã chọn thì dừng
+				if selectedElements[after] then
+					autoElement = false
+					elementBtn.Text = "Auto Element: DONE"
+					print("Đã đạt:", after)
+				end
+			end
+		end
+		task.wait(0.1)
+	end
 end)
 
--- AUTO SPIN
+--// AUTO SPIN (LEVEL)
 task.spawn(function()
-    while true do
-        if autoSpin and not spinning then
-            local lvl = getLevel()
-            local spins = getSpinCount()
+	while true do
+		if autoSpin then
+			local lvl = tonumber(string.match(getLevel(), "%d+"))
+			local spins = tonumber(getSpin())
 
-            if lvl >= 5 and spins > 0 then
-                spinning = true
-
-                spin:InvokeServer()
-                task.wait(1)
-
-                resetChar()
-                task.wait(3)
-
-                spinning = false
-            end
-        end
-        task.wait(1)
-    end
+			if lvl and lvl >= 6 and spins and spins > 0 then
+				SpinRemote:InvokeServer()
+				task.wait(1)
+				if player.Character then
+					player.Character:BreakJoints()
+				end
+				task.wait(3)
+			end
+		end
+		task.wait(1)
+	end
 end)
-```
+
+--// INTRO
+task.spawn(function()
+	while true do
+		if autoIntro then
+			IntroRemote:InvokeServer()
+		end
+		task.wait(1)
+	end
+end)
+
+--// UI UPDATE
+task.spawn(function()
+	while true do
+		levelLabel.Text = "Level: " .. getLevel()
+		spinLabel.Text = "Spin: " .. getSpin()
+		elementLabel.Text = "Element: " .. getElement()
+		task.wait(0.3)
+	end
+end)
+
+--// ANTI AFK
+player.Idled:Connect(function()
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new(0,0))
+end)
