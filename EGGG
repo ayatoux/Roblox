@@ -1,4 +1,6 @@
 --// SERVICES
+local spinHistory = {}
+local spinCount = 0
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
@@ -219,35 +221,41 @@ task.spawn(function()
 	end
 end)
 
---// ⚡ AUTO ELEMENT (ANTI COOLDOWN + LOG CHUẨN)
+--// ⚡ AUTO ELEMENT (ĐẾM SPIN CHUẨN)
 task.spawn(function()
 	local lastSpinCount = tonumber(getSpin()) or 0
 
 	while true do
 		if autoElement then
-			local currentSpin = tonumber(getSpin())
+			local spins = tonumber(getSpin())
 
-			if currentSpin and currentSpin > 0 then
+			if spins and spins > 0 then
 				-- thử quay
 				SpinRemote:InvokeServer()
-				task.wait(0.2)
+				task.wait(0.25)
 
-				-- check xem spin có giảm không
 				local newSpin = tonumber(getSpin())
 
+				-- nếu spin giảm => quay thành công
 				if newSpin and newSpin < lastSpinCount then
-					-- quay thành công
 					local result = getElement()
-
-					-- lưu log
-					table.insert(spinHistory, result)
 
 					print("Roll:", result)
 
-					-- đủ 5 lần thì gửi webhook
-					if #spinHistory >= 5 then
+					-- lưu log
+					table.insert(spinHistory, result)
+					spinCount += 1
+
+					-- cập nhật mốc mới
+					lastSpinCount = newSpin
+
+					-- đủ 5 lần quay thật
+					if spinCount >= 5 then
 						sendWebhook(spinHistory)
+
+						-- reset
 						table.clear(spinHistory)
+						spinCount = 0
 					end
 
 					-- check trúng target
@@ -256,8 +264,6 @@ task.spawn(function()
 						elementBtn.Text = "Auto Element: DONE"
 						print("Đã đạt:", result)
 					end
-
-					lastSpinCount = newSpin
 				end
 			end
 		end
