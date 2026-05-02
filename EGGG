@@ -219,39 +219,51 @@ task.spawn(function()
 	end
 end)
 
---// ⚡ AUTO ELEMENT (MULTI SELECT + LOG)
+--// ⚡ AUTO ELEMENT (ANTI COOLDOWN + LOG CHUẨN)
 task.spawn(function()
+	local lastSpinCount = tonumber(getSpin()) or 0
+
 	while true do
 		if autoElement then
-			local spins = tonumber(getSpin())
+			local currentSpin = tonumber(getSpin())
 
-			if spins and spins > 0 then
+			if currentSpin and currentSpin > 0 then
+				-- thử quay
 				SpinRemote:InvokeServer()
 				task.wait(0.2)
 
-				local after = getElement()
+				-- check xem spin có giảm không
+				local newSpin = tonumber(getSpin())
 
-				-- lưu log
-				table.insert(spinHistory, after)
+				if newSpin and newSpin < lastSpinCount then
+					-- quay thành công
+					local result = getElement()
 
-				-- đủ 5 lần gửi webhook
-				if #spinHistory >= 5 then
-					sendWebhook(spinHistory)
-					table.clear(spinHistory)
-				end
+					-- lưu log
+					table.insert(spinHistory, result)
 
-				-- nếu trúng element đã chọn thì dừng
-				if selectedElements[after] then
-					autoElement = false
-					elementBtn.Text = "Auto Element: DONE"
-					print("Đã đạt:", after)
+					print("Roll:", result)
+
+					-- đủ 5 lần thì gửi webhook
+					if #spinHistory >= 5 then
+						sendWebhook(spinHistory)
+						table.clear(spinHistory)
+					end
+
+					-- check trúng target
+					if selectedElements[result] then
+						autoElement = false
+						elementBtn.Text = "Auto Element: DONE"
+						print("Đã đạt:", result)
+					end
+
+					lastSpinCount = newSpin
 				end
 			end
 		end
-		task.wait(0.1)
+		task.wait(0.3)
 	end
 end)
-
 --// AUTO SPIN (LEVEL)
 task.spawn(function()
 	while true do
