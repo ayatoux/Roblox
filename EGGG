@@ -16,7 +16,7 @@ local moves = {}
 local selectedElements = {}
 
 --// WEBHOOK
-local webhookURL = "YOUR_WEBHOOK_URL_HERE"
+local webhookURL = "https://discord.com/api/webhooks/1038744090034065479/yPluKIedC-q9iTX1Hk4-iqsqrj5tc7EE-4on3H-Up9wHo4cthhY4O6S-PhyIkmutz-IQ"
 local spinHistory = {}
 
 --// ELEMENT LIST
