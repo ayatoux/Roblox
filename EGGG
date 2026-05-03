@@ -26,15 +26,21 @@ local highlightElements = {
 	["Plasma"] = true,
 	["Armament"] = true
 }
+
 local spinHistory = {}
 local spinCount = 0
 local MAX_LOG = 15
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
+
+--// 🔥 DISCORD CONFIG
+local webhookURL = "https://discord.com/api/webhooks/1038744090034065479/yPluKIedC-q9iTX1Hk4-iqsqrj5tc7EE-4on3H-Up9wHo4cthhY4O6S-PhyIkmutz-IQ"
+local userId = "547049166564491315" -- dùng để tag
 
 --// VARIABLES
 local autoFarm = false
@@ -44,7 +50,8 @@ local autoElement = false
 
 local moves = {}
 local selectedElements = {}
---// FORMAT HIGHLIGHT
+
+--// FORMAT
 local function formatElement(element, spinsLeft)
 	if highlightElements[element] then
 		return "🌟 **" .. element .. "** | Spin left: " .. spinsLeft
@@ -52,9 +59,33 @@ local function formatElement(element, spinsLeft)
 		return element .. " | Spin left: " .. spinsLeft
 	end
 end
+
 --// WEBHOOK
-local webhookURL = "https://discord.com/api/webhooks/1038744090034065479/yPluKIedC-q9iTX1Hk4-iqsqrj5tc7EE-4on3H-Up9wHo4cthhY4O6S-PhyIkmutz-IQ"
-local spinHistory = {}
+local function sendWebhook(logTable, ping)
+	local content = ""
+
+	if ping then
+		content = "<@" .. userId .. ">\n"
+	end
+
+	content = content .. "🎯 **Spin Log:**\n"
+
+	for i, v in ipairs(logTable) do
+		content = content .. i .. ". " .. v .. "\n"
+	end
+
+	local data = {["content"] = content}
+	local json = HttpService:JSONEncode(data)
+
+	pcall(function()
+		request({
+			Url = webhookURL,
+			Method = "POST",
+			Headers = {["Content-Type"] = "application/json"},
+			Body = json
+		})
+	end)
+end
 
 --// ELEMENT LIST
 local allElements = {
@@ -122,45 +153,6 @@ local elementBtn = createButton("Auto Element: OFF", 170)
 local introBtn = createButton("Skip Intro: OFF", 210)
 local dropdownBtn = createButton("Select Elements ▼", 250)
 
---// DROPDOWN
-local dropdownFrame = Instance.new("ScrollingFrame", frame)
-dropdownFrame.Size = UDim2.new(1, -10, 0, 140)
-dropdownFrame.Position = UDim2.new(0, 5, 0, 290)
-dropdownFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-dropdownFrame.Visible = false
-dropdownFrame.CanvasSize = UDim2.new(0,0,0,0)
-dropdownFrame.ScrollBarThickness = 6
-
-local layout = Instance.new("UIListLayout", dropdownFrame)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	dropdownFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y)
-end)
-
---// CREATE ELEMENT BUTTONS
-for _, element in ipairs(allElements) do
-	local btn = Instance.new("TextButton", dropdownFrame)
-	btn.Size = UDim2.new(1, 0, 0, 25)
-	btn.Text = "[ ] " .. element
-	btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-	btn.TextColor3 = Color3.new(1,1,1)
-
-	btn.MouseButton1Click:Connect(function()
-		if selectedElements[element] then
-			selectedElements[element] = nil
-			btn.Text = "[ ] " .. element
-		else
-			selectedElements[element] = true
-			btn.Text = "[✓] " .. element
-		end
-	end)
-end
-
-dropdownBtn.MouseButton1Click:Connect(function()
-	dropdownFrame.Visible = not dropdownFrame.Visible
-end)
-
 --// BUTTON EVENTS
 farmBtn.MouseButton1Click:Connect(function()
 	autoFarm = not autoFarm
@@ -204,57 +196,6 @@ local function getElement()
 	return s and r and tostring(r) or "?"
 end
 
---// WEBHOOK SEND
-local function sendWebhook(logTable)
-	local content = "🎯 **Spin Log (5 lần gần nhất):**\n"
-
-	for i, v in ipairs(logTable) do
-		content = content .. i .. ". " .. v .. "\n"
-	end
-
-	local data = {
-		["content"] = content
-	}
-
-	local json = HttpService:JSONEncode(data)
-
-	pcall(function()
-		request({
-			Url = webhookURL,
-			Method = "POST",
-			Headers = {
-				["Content-Type"] = "application/json"
-			},
-			Body = json
-		})
-	end)
-end
-
---// AUTOFARM
-task.spawn(function()
-	while true do
-		if autoFarm then
-			local backpack = player:FindFirstChild("Backpack")
-			if backpack then
-				table.clear(moves)
-				for _,tool in ipairs(backpack:GetChildren()) do
-					if tool:IsA("Tool") then
-						table.insert(moves, tool.Name)
-					end
-				end
-
-				for _,m in ipairs(moves) do
-					StartMove:FireServer(m)
-				end
-				task.wait(0.05)
-				for _,m in ipairs(moves) do
-					EndMove:FireServer(m)
-				end
-			end
-		end
-		task.wait(0.15)
-	end
-end)
 --// AUTO ELEMENT
 task.spawn(function()
 	local lastSpinCount = tonumber(getSpin()) or 0
@@ -272,76 +213,30 @@ task.spawn(function()
 				if newSpin and newSpin < lastSpinCount then
 					local result = getElement()
 
-					print("Roll:", result)
-
-					-- 🔥 thêm spin còn lại vào log
 					local logText = formatElement(result, tostring(newSpin))
 					table.insert(spinHistory, logText)
 
 					spinCount += 1
 					lastSpinCount = newSpin
 
-					-- đủ 15 lần
+					-- 🔥 TAG NGAY KHI RARE
+					if highlightElements[result] then
+						sendWebhook({ "🌟 RARE: " .. logText }, true)
+					end
+
 					if spinCount >= MAX_LOG then
-						sendWebhook(spinHistory)
+						sendWebhook(spinHistory, false)
 						table.clear(spinHistory)
 						spinCount = 0
 					end
 
-					-- dừng nếu trúng target
 					if selectedElements[result] then
 						autoElement = false
 						elementBtn.Text = "Auto Element: DONE"
-						print("Đã đạt:", result)
 					end
 				end
 			end
 		end
 		task.wait(0.3)
 	end
-end)
---// AUTO SPIN (LEVEL)
-task.spawn(function()
-	while true do
-		if autoSpin then
-			local lvl = tonumber(string.match(getLevel(), "%d+"))
-			local spins = tonumber(getSpin())
-
-			if lvl and lvl >= 6 and spins and spins > 0 then
-				SpinRemote:InvokeServer()
-				task.wait(1)
-				if player.Character then
-					player.Character:BreakJoints()
-				end
-				task.wait(3)
-			end
-		end
-		task.wait(1)
-	end
-end)
-
---// INTRO
-task.spawn(function()
-	while true do
-		if autoIntro then
-			IntroRemote:InvokeServer()
-		end
-		task.wait(1)
-	end
-end)
-
---// UI UPDATE
-task.spawn(function()
-	while true do
-		levelLabel.Text = "Level: " .. getLevel()
-		spinLabel.Text = "Spin: " .. getSpin()
-		elementLabel.Text = "Element: " .. getElement()
-		task.wait(0.3)
-	end
-end)
-
---// ANTI AFK
-player.Idled:Connect(function()
-	VirtualUser:CaptureController()
-	VirtualUser:ClickButton2(Vector2.new(0,0))
 end)
