@@ -38,9 +38,9 @@ local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 
---// 🔥 DISCORD CONFIG
+--// 🔥 DISCORD CONFIG (BẮT BUỘC SỬA)
 local webhookURL = "https://discord.com/api/webhooks/1038744090034065479/yPluKIedC-q9iTX1Hk4-iqsqrj5tc7EE-4on3H-Up9wHo4cthhY4O6S-PhyIkmutz-IQ"
-local userId = "547049166564491315" -- dùng để tag
+local userId = "547049166564491315"
 
 --// VARIABLES
 local autoFarm = false
@@ -53,6 +53,7 @@ local selectedElements = {}
 
 --// FORMAT
 local function formatElement(element, spinsLeft)
+	element = tostring(element)
 	if highlightElements[element] then
 		return "🌟 **" .. element .. "** | Spin left: " .. spinsLeft
 	else
@@ -71,7 +72,7 @@ local function sendWebhook(logTable, ping)
 	content = content .. "🎯 **Spin Log:**\n"
 
 	for i, v in ipairs(logTable) do
-		content = content .. i .. ". " .. v .. "\n"
+		content = content .. tostring(v) .. "\n"
 	end
 
 	local data = {["content"] = content}
@@ -151,9 +152,7 @@ local farmBtn = createButton("Auto Farm: OFF", 90)
 local spinBtn = createButton("Auto Spin: OFF", 130)
 local elementBtn = createButton("Auto Element: OFF", 170)
 local introBtn = createButton("Skip Intro: OFF", 210)
-local dropdownBtn = createButton("Select Elements ▼", 250)
 
---// BUTTON EVENTS
 farmBtn.MouseButton1Click:Connect(function()
 	autoFarm = not autoFarm
 	farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
@@ -174,29 +173,35 @@ introBtn.MouseButton1Click:Connect(function()
 	introBtn.Text = "Skip Intro: " .. (autoIntro and "ON" or "OFF")
 end)
 
---// DATA
+--// DATA FIX
 local function getLevel()
 	local s,r = pcall(function()
-		return player.PlayerGui.StatsGui.BarsFrame.Level.Text
+		return tostring(player.PlayerGui.StatsGui.BarsFrame.Level.Text)
 	end)
 	return s and r or "?"
 end
 
 local function getSpin()
 	local s,r = pcall(function()
-		return GetSpinsRemote:InvokeServer()
+		return tostring(GetSpinsRemote:InvokeServer())
 	end)
-	return s and r and tostring(r) or "?"
+	return s and r or "?"
 end
 
 local function getElement()
 	local s,r = pcall(function()
-		return GetElementRemote:InvokeServer()
+		local result = GetElementRemote:InvokeServer()
+
+		if typeof(result) == "table" then
+			return tostring(result.Name or result.Element or "Unknown")
+		end
+
+		return tostring(result)
 	end)
-	return s and r and tostring(r) or "?"
+	return s and r or "?"
 end
 
---// AUTO ELEMENT
+--// AUTO ELEMENT (FIX + TAG)
 task.spawn(function()
 	local lastSpinCount = tonumber(getSpin()) or 0
 
@@ -219,7 +224,6 @@ task.spawn(function()
 					spinCount += 1
 					lastSpinCount = newSpin
 
-					-- 🔥 TAG NGAY KHI RARE
 					if highlightElements[result] then
 						sendWebhook({ "🌟 RARE: " .. logText }, true)
 					end
@@ -229,14 +233,25 @@ task.spawn(function()
 						table.clear(spinHistory)
 						spinCount = 0
 					end
-
-					if selectedElements[result] then
-						autoElement = false
-						elementBtn.Text = "Auto Element: DONE"
-					end
 				end
 			end
 		end
 		task.wait(0.3)
 	end
+end)
+
+--// UI UPDATE
+task.spawn(function()
+	while true do
+		levelLabel.Text = "Level: " .. getLevel()
+		spinLabel.Text = "Spin: " .. getSpin()
+		elementLabel.Text = "Element: " .. getElement()
+		task.wait(0.3)
+	end
+end)
+
+--// ANTI AFK
+player.Idled:Connect(function()
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new(0,0))
 end)
