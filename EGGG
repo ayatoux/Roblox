@@ -29,7 +29,7 @@ local highlightElements = {
 
 local spinHistory = {}
 local spinCount = 0
-local MAX_LOG = 15
+local MAX_LOG = 30
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
