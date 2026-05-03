@@ -1,0 +1,358 @@
+--// SERVICES
+local highlightElements = {
+	["Dragon"] = true,
+	["Heaven's Wrath"] = true,
+	["Arc of the Elements"] = true,
+	["Time"] = true,
+	["Telekinesis"] = true,
+	["Necromancer"] = true,
+	["Destruction"] = true,
+	["Spectre"] = true,
+	["Acceleration"] = true,
+	["Dragon Blade"] = true,
+	["Vampire"] = true,
+	["Solar"] = true,
+	["Phoenix"] = true,
+	["Hydra"] = true,
+	["Lunar"] = true,
+	["Illusion"] = true,
+	["Prism"] = true,
+	["Cosmic"] = true,
+	["Mechanization"] = true,
+	["Lava"] = true,
+	["Sound"] = true,
+	["Chaos"] = true,
+	["Radiation"] = true,
+	["Plasma"] = true,
+	["Armament"] = true
+}
+local spinHistory = {}
+local spinCount = 0
+local MAX_LOG = 15
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+
+
+
+local player = Players.LocalPlayer
+
+--// VARIABLES
+local autoFarm = false
+local autoSpin = false
+local autoIntro = false
+local autoElement = false
+
+local moves = {}
+local selectedElements = {}
+--// FORMAT HIGHLIGHT
+local function formatElement(element, spinsLeft)
+	if highlightElements[element] then
+		return "🌟 **" .. element .. "** | Spin left: " .. spinsLeft
+	else
+		return element .. " | Spin left: " .. spinsLeft
+	end
+end
+--// WEBHOOK
+local userID = "547049166564491315" -- thay bằng ID Discord của bạn
+local webhookURL = "https://discord.com/api/webhooks/1038744090034065479/yPluKIedC-q9iTX1Hk4-iqsqrj5tc7EE-4on3H-Up9wHo4cthhY4O6S-PhyIkmutz-IQ"
+local spinHistory = {}
+
+--// ELEMENT LIST
+local allElements = {
+	"Dragon","Heaven's Wrath","Arc of the Elements","Time","Telekinesis","Necromancer","Destruction","Spectre","Acceleration","Dragon Blade","Vampire",
+	"Solar","Phoenix","Hydra","Lunar","Illusion","Prism","Cosmic",
+	"Mechanization","Lava","Sound","Chaos","Radiation","Plasma","Armament",
+	"Nova","Metal","Blood","Explosion",
+	"Fire","Water","Poison","Sand","Dark","Light","Ice","Lightning","Wood","Earth","Wind"
+}
+
+--// REMOTES
+local clientFolder = ReplicatedStorage:WaitForChild(player.UserId .. "Client")
+local StartMove = clientFolder:WaitForChild("StartMove")
+local EndMove = clientFolder:WaitForChild("EndMove")
+
+local SpinRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Spin")
+local IntroRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("Intro")
+local GetSpinsRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("GetSpins")
+local GetElementRemote = ReplicatedStorage:WaitForChild("Client"):WaitForChild("GetElement")
+
+--// GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "MobileGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 220, 0, 420)
+frame.Position = UDim2.new(0.1, 0, 0.2, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Active = true
+frame.Draggable = true
+
+local function createButton(text, y)
+	local b = Instance.new("TextButton", frame)
+	b.Size = UDim2.new(1, -10, 0, 35)
+	b.Position = UDim2.new(0, 5, 0, y)
+	b.BackgroundColor3 = Color3.fromRGB(50,50,50)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Text = text
+	return b
+end
+
+--// LABELS
+local levelLabel = Instance.new("TextLabel", frame)
+levelLabel.Size = UDim2.new(1, -10, 0, 25)
+levelLabel.Position = UDim2.new(0,5,0,5)
+levelLabel.BackgroundTransparency = 1
+levelLabel.TextColor3 = Color3.new(1,1,1)
+
+local spinLabel = Instance.new("TextLabel", frame)
+spinLabel.Size = UDim2.new(1, -10, 0, 25)
+spinLabel.Position = UDim2.new(0,5,0,30)
+spinLabel.BackgroundTransparency = 1
+spinLabel.TextColor3 = Color3.new(1,1,1)
+
+local elementLabel = Instance.new("TextLabel", frame)
+elementLabel.Size = UDim2.new(1, -10, 0, 25)
+elementLabel.Position = UDim2.new(0,5,0,55)
+elementLabel.BackgroundTransparency = 1
+elementLabel.TextColor3 = Color3.new(1,1,1)
+
+--// BUTTONS
+local farmBtn = createButton("Auto Farm: OFF", 90)
+local spinBtn = createButton("Auto Spin: OFF", 130)
+local elementBtn = createButton("Auto Element: OFF", 170)
+local introBtn = createButton("Skip Intro: OFF", 210)
+local dropdownBtn = createButton("Select Elements ▼", 250)
+
+--// DROPDOWN
+local dropdownFrame = Instance.new("ScrollingFrame", frame)
+dropdownFrame.Size = UDim2.new(1, -10, 0, 140)
+dropdownFrame.Position = UDim2.new(0, 5, 0, 290)
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+dropdownFrame.Visible = false
+dropdownFrame.CanvasSize = UDim2.new(0,0,0,0)
+dropdownFrame.ScrollBarThickness = 6
+
+local layout = Instance.new("UIListLayout", dropdownFrame)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	dropdownFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y)
+end)
+
+--// CREATE ELEMENT BUTTONS
+for _, element in ipairs(allElements) do
+	local btn = Instance.new("TextButton", dropdownFrame)
+	btn.Size = UDim2.new(1, 0, 0, 25)
+	btn.Text = "[ ] " .. element
+	btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+	btn.TextColor3 = Color3.new(1,1,1)
+
+	btn.MouseButton1Click:Connect(function()
+		if selectedElements[element] then
+			selectedElements[element] = nil
+			btn.Text = "[ ] " .. element
+		else
+			selectedElements[element] = true
+			btn.Text = "[✓] " .. element
+		end
+	end)
+end
+
+dropdownBtn.MouseButton1Click:Connect(function()
+	dropdownFrame.Visible = not dropdownFrame.Visible
+end)
+
+--// BUTTON EVENTS
+farmBtn.MouseButton1Click:Connect(function()
+	autoFarm = not autoFarm
+	farmBtn.Text = "Auto Farm: " .. (autoFarm and "ON" or "OFF")
+end)
+
+spinBtn.MouseButton1Click:Connect(function()
+	autoSpin = not autoSpin
+	spinBtn.Text = "Auto Spin: " .. (autoSpin and "ON" or "OFF")
+end)
+
+elementBtn.MouseButton1Click:Connect(function()
+	autoElement = not autoElement
+	elementBtn.Text = "Auto Element: " .. (autoElement and "ON" or "OFF")
+end)
+
+introBtn.MouseButton1Click:Connect(function()
+	autoIntro = not autoIntro
+	introBtn.Text = "Skip Intro: " .. (autoIntro and "ON" or "OFF")
+end)
+
+--// DATA
+local function getLevel()
+	local s,r = pcall(function()
+		return player.PlayerGui.StatsGui.BarsFrame.Level.Text
+	end)
+	return s and r or "?"
+end
+
+local function getSpin()
+	local s,r = pcall(function()
+		return GetSpinsRemote:InvokeServer()
+	end)
+	return s and r and tostring(r) or "?"
+end
+
+local function getElement()
+	local s,r = pcall(function()
+		return GetElementRemote:InvokeServer()
+	end)
+	return s and r and tostring(r) or "?"
+end
+
+--// WEBHOOK SEND
+local function sendWebhook(logTable, mention)
+	local content = "🎯 **Spin Log (5 lần gần nhất):**\n"
+
+	for i, v in ipairs(logTable) do
+		content = content .. i .. ". " .. v .. "\n"
+	end
+
+	if mention then
+		content = "<@" .. userID .. ">\n" .. content
+	end
+
+	local data = {
+		["content"] = content
+	}
+
+	local json = HttpService:JSONEncode(data)
+
+	pcall(function()
+		request({
+			Url = webhookURL,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json"
+			},
+			Body = json
+		})
+	end)
+end
+--// AUTOFARM
+task.spawn(function()
+	while true do
+		if autoFarm then
+			local backpack = player:FindFirstChild("Backpack")
+			if backpack then
+				table.clear(moves)
+				for _,tool in ipairs(backpack:GetChildren()) do
+					if tool:IsA("Tool") then
+						table.insert(moves, tool.Name)
+					end
+				end
+
+				for _,m in ipairs(moves) do
+					StartMove:FireServer(m)
+				end
+				task.wait(0.05)
+				for _,m in ipairs(moves) do
+					EndMove:FireServer(m)
+				end
+			end
+		end
+		task.wait(0.15)
+	end
+end)
+--// AUTO ELEMENT
+task.spawn(function()
+	local lastSpinCount = tonumber(getSpin()) or 0
+
+	while true do
+		if autoElement then
+			local spins = tonumber(getSpin())
+
+			if spins and spins > 0 then
+				SpinRemote:InvokeServer()
+				task.wait(0.25)
+
+				local newSpin = tonumber(getSpin())
+
+				if newSpin and newSpin < lastSpinCount then
+					local result = getElement()
+
+					print("Roll:", result)
+
+					-- 🔥 thêm spin còn lại vào log
+					local logText = formatElement(result, tostring(newSpin))
+					table.insert(spinHistory, logText)
+
+-- 🔥 TAG NGAY nếu là element hiếm
+if highlightElements[result] then
+	sendWebhook({ "🌟 HIT: " .. result .. " | Spin left: " .. tostring(newSpin) }, true)
+end
+
+					spinCount += 1
+					lastSpinCount = newSpin
+
+					-- đủ 15 lần
+					if spinCount >= MAX_LOG then
+						sendWebhook(spinHistory)
+						table.clear(spinHistory)
+						spinCount = 0
+					end
+
+					-- dừng nếu trúng target
+					if selectedElements[result] then
+						autoElement = false
+						elementBtn.Text = "Auto Element: DONE"
+						print("Đã đạt:", result)
+					end
+				end
+			end
+		end
+		task.wait(0.3)
+	end
+end)
+--// AUTO SPIN (LEVEL)
+task.spawn(function()
+	while true do
+		if autoSpin then
+			local lvl = tonumber(string.match(getLevel(), "%d+"))
+			local spins = tonumber(getSpin())
+
+			if lvl and lvl >= 6 and spins and spins > 0 then
+				SpinRemote:InvokeServer()
+				task.wait(1)
+				if player.Character then
+					player.Character:BreakJoints()
+				end
+				task.wait(3)
+			end
+		end
+		task.wait(1)
+	end
+end)
+
+--// INTRO
+task.spawn(function()
+	while true do
+		if autoIntro then
+			IntroRemote:InvokeServer()
+		end
+		task.wait(1)
+	end
+end)
+
+--// UI UPDATE
+task.spawn(function()
+	while true do
+		levelLabel.Text = "Level: " .. getLevel()
+		spinLabel.Text = "Spin: " .. getSpin()
+		elementLabel.Text = "Element: " .. getElement()
+		task.wait(0.3)
+	end
+end)
+
+--// ANTI AFK
+player.Idled:Connect(function()
+	VirtualUser:CaptureController()
+	VirtualUser:ClickButton2(Vector2.new(0,0))
+end)
